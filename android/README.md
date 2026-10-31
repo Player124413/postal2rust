@@ -76,11 +76,16 @@ The launcher hands over settings through two small files in the app folder: `and
 
 ## Status and what is not verified yet
 
-- The build pipeline is set up, but the first CI runs decide whether it compiles. Compile errors
-  show up in the **android-debug** workflow logs.
+- CI status: the **android-debug** workflow builds the desktop library and binary
+  (`cargo check`) and the debug APK. Both jobs pass on the current branch. Failing steps are
+  repeated as annotations on the check run, so the reason shows up without opening the raw logs.
+- Not run on a device or emulator yet. Launching the game, touch input and the layout editor
+  still need a manual check on a phone.
 - Not measured yet: 60 FPS on real phones, memory use with a full map, battery and heat. Use F3 on
   a phone and report numbers.
 - Textures are decoded to RGBA8 as on desktop. Mobile GPUs cannot read the DXT/BC textures of the
-  original game, so a compressed format is needed for lower memory. ETC2 is the baseline that every
-  64-bit Android GPU supports (and ASTC on newer ones); converting the textures is a separate task.
+  original game, so a compressed format is needed for lower memory. ETC2 is mandatory in OpenGL ES 3.0
+  and in Vulkan, so every 64-bit Android GPU that runs this build can read it; converting the textures
+  is a separate task and is only needed if memory is short. Source: the
+  [Android developer guide on texture compression](https://developer.android.com/guide/playcore/asset-delivery/texture-compression).
 - Only `arm64-v8a` is built. Emulators on x86_64 hosts need an extra ABI.
