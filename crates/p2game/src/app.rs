@@ -538,6 +538,11 @@ pub fn android_main(data_dir: PathBuf) {
                 // SAFETY: as above.
                 unsafe { std::env::set_var("P2GAME_FPS_LIMIT", v) };
             }
+            // `backend=gl` runs the renderer on OpenGL ES instead of Vulkan (wgpu reads WGPU_BACKEND).
+            if line.trim() == "backend=gl" {
+                // SAFETY: as above.
+                unsafe { std::env::set_var("WGPU_BACKEND", "gl") };
+            }
         }
     }
     let flag = data_dir.join("start_touch_editor");

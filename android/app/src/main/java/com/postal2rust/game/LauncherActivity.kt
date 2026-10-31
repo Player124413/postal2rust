@@ -48,6 +48,7 @@ class LauncherActivity : ComponentActivity() {
     private lateinit var deleteButton: Button
     private lateinit var editorButton: Button
     private lateinit var fpsSpinner: Spinner
+    private lateinit var backendButton: Button
 
     @Volatile private var copying = false
     @Volatile private var cancelCopy = false
@@ -189,6 +190,19 @@ class LauncherActivity : ComponentActivity() {
         column.addView(fpsSpinner, spaced(top = 4))
         column.addView(
             text("60 FPS — цель по умолчанию: одинаково ровно на всех телефонах. 90 и 120 — для экранов с высокой частотой, но тяжелее для батареи и температуры.", 12f),
+            spaced(top = 4),
+        )
+
+        column.addView(text("Графика (для проверки падения)", 15f, bold = true), spaced(top = 22))
+        backendButton = button(backendLabel()) {
+            val next = if (prefs().getString(KEY_BACKEND, "vulkan") == "gl") "vulkan" else "gl"
+            prefs().edit().putString(KEY_BACKEND, next).apply()
+            backendButton.text = backendLabel()
+            writeConfig()
+        }
+        column.addView(backendButton, spaced(top = 4))
+        column.addView(
+            text("Если с OpenGL ES игра не падает, а с Vulkan падает — сообщите об этом: это драйвер GPU.", 12f),
             spaced(top = 4),
         )
 
@@ -360,10 +374,15 @@ class LauncherActivity : ComponentActivity() {
         startActivity(Intent(this, android.app.NativeActivity::class.java))
     }
 
-    /** Settings the native side reads at start: `fps=N`. */
+    private fun backendLabel(): String =
+        if (prefs().getString(KEY_BACKEND, "vulkan") == "gl") "Графика: OpenGL ES (нажмите, чтобы вернуть Vulkan)"
+        else "Графика: Vulkan (по умолчанию, нажмите для OpenGL ES)"
+
+    /** Settings the native side reads at start: `fps=N` and `backend=vulkan|gl`. */
     private fun writeConfig() {
         val fps = prefs().getInt(KEY_FPS, 60)
-        File(dataDir(), "android.cfg").writeText("# written by the launcher\nfps=$fps\n")
+        val backend = prefs().getString(KEY_BACKEND, "vulkan")
+        File(dataDir(), "android.cfg").writeText("# written by the launcher\nfps=$fps\nbackend=$backend\n")
     }
 
     // ---- helpers ----------------------------------------------------------------------------
@@ -393,6 +412,7 @@ class LauncherActivity : ComponentActivity() {
 
     companion object {
         private const val KEY_FPS = "fps"
+        private const val KEY_BACKEND = "backend"
         private val FPS_VALUES = listOf(30, 60, 90, 120)
         /** How much of the log goes to the clipboard (the full log is in the shared file). */
         private const val COPY_CHARS = 100_000
