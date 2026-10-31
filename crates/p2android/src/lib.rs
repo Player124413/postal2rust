@@ -3,6 +3,10 @@
 
 use bevy::prelude::*;
 
+// mimalloc is used on desktop only. On Android the game crashed with SIGSEGV on the Java main
+// thread, far from any game code, which is the pattern of heap corruption. Bionic's allocator is
+// used there to test whether the crash goes away.
+#[cfg(not(target_os = "android"))]
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 

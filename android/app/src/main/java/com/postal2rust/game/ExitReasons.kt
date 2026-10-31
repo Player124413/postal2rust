@@ -16,7 +16,14 @@ import java.util.Date
  * across app updates, so a crash of an older build can still be found.
  */
 object ExitReasons {
-    private const val MAX_TRACE_CHARS = 200_000
+    private const val MAX_TRACE_CHARS = 30_000
+
+    /** The native trace is a binary protobuf. Its readable parts (function names, library paths,
+     *  build ids) are kept; the binary noise between them is dropped. */
+    private fun readableTrace(bytes: ByteArray): String {
+        val text = String(bytes, Charsets.ISO_8859_1)
+        return Regex("[\\x20-\\x7e]{4,}").findAll(text).joinToString("\n") { it.value }
+    }
 
     /** Adds the exit reasons that are not in `exit.txt` yet. Returns how many were added. */
     fun record(context: Context, logsDir: File): Int {
@@ -38,7 +45,7 @@ object ExitReasons {
                 append("importance: ${info.importance}\n")
                 append("description: ${info.description ?: "-"}\n")
                 val trace = try {
-                    info.traceInputStream?.bufferedReader()?.use { it.readText() }
+                    info.traceInputStream?.use { readableTrace(it.readBytes()) }
                 } catch (e: Exception) {
                     null
                 }
