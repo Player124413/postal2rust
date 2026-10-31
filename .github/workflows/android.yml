@@ -1,0 +1,84 @@
+name: android-debug
+
+# Builds the Android debug APK (arm64-v8a only) and checks that the desktop build still compiles
+# after the host moved from the binary into the library.
+#
+# * Push to arena/** or ci/**, or run by hand: artifacts only.
+# * The APK is signed with the fixed debug key in android/app/keystore, so each build updates the
+#   previous one in place (same applicationId, same signature, a higher versionCode).
+
+on:
+  push:
+    branches: ["arena/**", "ci/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-debug-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  desktop-check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: System libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends pkg-config libasound2-dev libudev-dev libxkbcommon-dev libwayland-dev
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: desktop-check
+      - name: Check the desktop game (library + binary)
+        run: cargo check --locked -p p2game
+
+  apk:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # versionCode is the number of commits: the full history is needed.
+          fetch-depth: 0
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v3
+      - name: Android SDK packages
+        run: |
+          yes | sdkmanager --licenses > /dev/null
+          sdkmanager --install "platforms;android-35" "build-tools;35.0.0"
+      - uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r27c
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-ndk
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: android-arm64-release
+      - name: Build libp2android.so (release profile: the game code is optimized even in the debug APK)
+        run: cargo ndk -t arm64-v8a -P 26 -o android/app/src/main/jniLibs build -p p2android --profile release
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.10.2"
+      - name: Build the debug APK
+        working-directory: android
+        run: gradle --no-daemon :app:assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Postal2Rust-android-arm64-debug
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error

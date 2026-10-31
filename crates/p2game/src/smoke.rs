@@ -23,7 +23,7 @@
 //! The same [`SmokeDriver`] can feed the windowed mode (stage screenshots).
 
 use crate::frontend::{FrameInput, Frontend};
-use p2game::boot::Game;
+use crate::boot::Game;
 use p2input::bevy_map::InputEvent;
 use p2input::{Action, Key};
 use std::collections::BTreeMap;
@@ -422,7 +422,7 @@ pub(crate) fn run(mut game: Game, game_root: &std::path::Path, out_dir: &std::pa
         }
         game.tick(dt);
         game.drain_log(false);
-        for l in p2game::save::process_requests(&mut game) {
+        for l in crate::save::process_requests(&mut game) {
             println!("smoke: {l}");
         }
         let (events, mouse) = drv.input(&mut game, &front);

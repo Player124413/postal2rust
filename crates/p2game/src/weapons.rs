@@ -16,7 +16,7 @@ use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
 use p2anim::rig::{RigCache, c_mat};
 use p2canvas::natives::{self, ActorDraw};
-use p2game::host::{actor_world, resolve_path};
+use crate::host::{actor_world, resolve_path};
 use std::collections::HashMap;
 use uscript::vm::{ObjId, Value};
 
@@ -95,13 +95,13 @@ impl uscript::host::Host for ViewportExt {
     }
 }
 
-fn level_hook(host: &p2game::host::GameHost, _vm: &mut uscript::vm::Vm) {
+fn level_hook(host: &crate::host::GameHost, _vm: &mut uscript::vm::Vm) {
     host.ext.borrow_mut().push(std::rc::Rc::new(ViewportExt));
 }
 
 /// Registers the weapons extension host for every level (and the running one).
 pub(crate) fn install(sim: &mut Sim) {
-    p2game::host::register_level_hook(level_hook);
+    crate::host::register_level_hook(level_hook);
     level_hook(&sim.game.host, &mut sim.game.world.vm);
 }
 
@@ -310,7 +310,7 @@ fn exec_hook(mut sim: NonSendMut<Sim>, mut frame: Local<u32>, mut last: Local<St
                     let target = match who {
                         "pc" => Some(pc),
                         "pawn" => vm.get_prop(pc, "Pawn").and_then(|v| v.as_obj()),
-                        k => p2game::demo::find_actor(vm, k).or_else(|| (0..vm.objects.len()).find(|&o| !vm.objects[o].deleted && vm.object_name(o).eq_ignore_ascii_case(k))),
+                        k => crate::demo::find_actor(vm, k).or_else(|| (0..vm.objects.len()).find(|&o| !vm.objects[o].deleted && vm.object_name(o).eq_ignore_ascii_case(k))),
                     };
                     if let Some(o) = target {
                         let vals: Vec<String> = props
@@ -417,7 +417,7 @@ fn exec_hook(mut sim: NonSendMut<Sim>, mut frame: Local<u32>, mut last: Local<St
 }
 
 /// Prints the player's weapon state and inventory chain.
-pub(crate) fn probe(vm: &uscript::vm::Vm, host: Option<&p2game::host::GameHost>, pc: ObjId, f: u32) {
+pub(crate) fn probe(vm: &uscript::vm::Vm, host: Option<&crate::host::GameHost>, pc: ObjId, f: u32) {
     let pawn = vm.get_prop(pc, "Pawn").and_then(|v| v.as_obj());
     let weap = pawn.and_then(|p| vm.get_prop(p, "Weapon")).and_then(|v| v.as_obj());
     let mut inv = Vec::new();
@@ -783,7 +783,7 @@ fn sun_reaches(eye: [f32; 3], dir: Vec3) -> bool {
 }
 
 fn sun_reaches_uncached(eye: [f32; 3], dir: Vec3) -> bool {
-    let Some(w) = p2game::physics::level_collision() else { return true };
+    let Some(w) = crate::physics::level_collision() else { return true };
     // Bevy (x, y up, z) -> Unreal (x, z, y).
     let to_sun = Vec3::new(-dir.x, -dir.z, -dir.y).normalize_or_zero();
     if to_sun == Vec3::ZERO {
@@ -826,7 +826,7 @@ fn fp_weapon(
     canvas.draws = statics;
     if let Ok(w) = windows.single() {
         WINDOW_SIZE.with(|s| s.set((w.physical_width().max(1), w.physical_height().max(1))));
-        p2game::viewport::set_size(w.physical_width(), w.physical_height());
+        crate::viewport::set_size(w.physical_width(), w.physical_height());
     }
     let vm = &sim.game.world.vm;
     let host = &sim.game.host;
@@ -994,7 +994,7 @@ fn fp_weapon(
             continue;
         }
         let Some(x) = anims.get_mut(a) else { continue };
-        let to_world = p2game::host::skel_actor_world(vm, *a, x.inst.skeleton.mesh_xform) * x.inst.skeleton.mesh_xform;
+        let to_world = crate::host::skel_actor_world(vm, *a, x.inst.skeleton.mesh_xform) * x.inst.skeleton.mesh_xform;
         for (e, m) in r.joints.iter().zip(x.inst.bone_matrices()) {
             if let Ok(mut tf) = tfs.get_mut(*e) {
                 *tf = Transform::from_matrix(cm * to_world * *m * ci);

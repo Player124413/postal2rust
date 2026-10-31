@@ -4088,6 +4088,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "p2android"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "mimalloc",
+ "p2game",
+]
+
+[[package]]
 name = "p2anim"
 version = "0.1.0"
 dependencies = [

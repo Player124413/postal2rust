@@ -5,7 +5,7 @@
 //!   leaves it (UE2 captures the mouse the same way). Menus, the console, the dev menu/editor, and
 //!   losing focus (Alt+Tab) release it. `P2GAME_NO_GRAB=1` disables the lock.
 //! - Quit: the `exit` / `quit` console command (main menu Exit, Quit to desktop) sets
-//!   [`p2game::host::quit_requested`]; this closes the app (window, audio, process).
+//!   [`crate::host::quit_requested`]; this closes the app (window, audio, process).
 
 use crate::ui::UiInput;
 use bevy::prelude::*;
@@ -20,7 +20,7 @@ impl Plugin for CursorPlugin {
 }
 
 fn quit_on_request(mut exit: MessageWriter<AppExit>, mut sent: Local<bool>, mut windows: Query<&mut CursorOptions, With<PrimaryWindow>>) {
-    if !*sent && p2game::host::quit_requested() {
+    if !*sent && crate::host::quit_requested() {
         *sent = true;
         println!("quit: exit requested by script, closing");
         if let Ok(mut cur) = windows.single_mut() {
@@ -66,7 +66,8 @@ fn cursor_lock(ui: Option<Res<UiInput>>, dev: Option<Res<crate::devmenu::DevStat
     let Ok((win, mut cur)) = windows.single_mut() else { return };
     let dev_open = dev.is_some_and(|d| d.open || d.editor);
     let look = ui.is_some_and(|u| u.game_look && !u.captured);
-    let want = !auto && win.focused && look && !dev_open;
+    // Touch screens have no mouse to lock; the touch layer (touch.rs) supplies the look deltas.
+    let want = !auto && !cfg!(target_os = "android") && win.focused && look && !dev_open;
     // Locked (relative motion, stays in place) where supported, else confined to the window.
     let mode = if want {
         if cfg!(windows) { CursorGrabMode::Confined } else { CursorGrabMode::Locked }

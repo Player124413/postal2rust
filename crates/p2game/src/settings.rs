@@ -136,7 +136,9 @@ pub(crate) fn initial_window(vm: &mut Vm, title: String) -> Window {
         (v.width, v.height) = (w, h);
     }
     v.vsync = user_value(vm, OURS, "VSync").map(|s| truthy(&s)).unwrap_or(true) && std::env::var_os("P2GAME_NOVSYNC").is_none();
-    v.fps_limit = std::env::var("P2GAME_FPS_LIMIT").ok().or_else(|| user_value(vm, OURS, "FrameRateLimit")).and_then(|s| s.trim().parse().ok()).unwrap_or(0);
+    // Android: the window is the whole screen, and 60 FPS is the target phones are tuned for
+    // (the launcher or P2GAME_FPS_LIMIT can pick another cap; 0 = uncapped, vsync still applies).
+    v.fps_limit = std::env::var("P2GAME_FPS_LIMIT").ok().or_else(|| user_value(vm, OURS, "FrameRateLimit")).and_then(|s| s.trim().parse().ok()).unwrap_or(if cfg!(target_os = "android") { 60 } else { 0 });
     v.brightness = ini_float(vm, "Brightness").unwrap_or(0.5).clamp(0.0, 1.0);
     v.contrast = ini_float(vm, "Contrast").unwrap_or(0.5).clamp(0.0, 2.0);
     v.gamma = ini_float(vm, "Gamma").unwrap_or(1.0).clamp(0.3, 3.0);
@@ -150,6 +152,10 @@ pub(crate) fn initial_window(vm: &mut Vm, title: String) -> Window {
         // The exact video mode is picked in `apply` once the monitors are known.
         Mode::Fullscreen => WindowMode::Fullscreen(MonitorSelection::Primary, VideoModeSelection::Current),
     };
+    if cfg!(target_os = "android") {
+        // The surface is the whole display; windowed modes do not exist there.
+        v.mode = Mode::Borderless;
+    }
     v.dirty = v.mode == Mode::Fullscreen;
     // Where the user last left the window (position and size), for every windowed launch.
     crate::window_memory::apply_saved(&mut w);
@@ -182,7 +188,7 @@ impl uscript::host::Host for SettingsExt {
         let c = command.split_whitespace().collect::<Vec<_>>().join(" ");
         let lc = c.to_ascii_lowercase();
         let (verb, rest) = lc.split_once(' ').unwrap_or((lc.as_str(), ""));
-        let (cw, ch) = p2game::viewport::size();
+        let (cw, ch) = crate::viewport::size();
         let v = video();
         let set_user = |vm: &mut Vm, sec: &str, k: &str, val: String| {
             let _ = vm.user_ini_set(INI, sec, k, &val);
@@ -451,7 +457,7 @@ fn open_url(url: &str) {
     }
 }
 
-fn level_hook(host: &p2game::host::GameHost, vm: &mut Vm) {
+fn level_hook(host: &crate::host::GameHost, vm: &mut Vm) {
     // First in the list: these answers win over the fixed viewport replies of older hosts.
     host.ext.borrow_mut().insert(0, Rc::new(SettingsExt));
     vm.watch_calls("CreateMenuContents", menu_created);
@@ -462,7 +468,7 @@ fn level_hook(host: &p2game::host::GameHost, vm: &mut Vm) {
 }
 
 pub(crate) fn install(sim: &mut crate::window::Sim) {
-    p2game::host::register_level_hook(level_hook);
+    crate::host::register_level_hook(level_hook);
     level_hook(&sim.game.host, &mut sim.game.world.vm);
 }
 

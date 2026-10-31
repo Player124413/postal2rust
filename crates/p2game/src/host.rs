@@ -125,7 +125,7 @@ pub(crate) fn run_level_hooks(host: &GameHost, vm: &mut Vm) {
     for (f, module) in hooks {
         let before = host.frame_hooks.borrow().len();
         f(host, vm);
-        // Label the frame hooks this subsystem added (`p2game::physics::level_hook` -> physics).
+        // Label the frame hooks this subsystem added (`crate::physics::level_hook` -> physics).
         let n = host.frame_hooks.borrow().len();
         let mut names = host.frame_hook_names.borrow_mut();
         names.resize(n, None);

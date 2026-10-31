@@ -1,5 +1,5 @@
 //! Matinee cutscenes in the window: while a scene runs, the 3D camera shows the scene's camera
-//! (location, rotation, FOV from [`p2game::cinema`]) instead of the player's eyes, and the scene's
+//! (location, rotation, FOV from [`crate::cinema`]) instead of the player's eyes, and the scene's
 //! screen fade is drawn over the view. The letterbox bars come from script (`HUD.bCinematicView`
 //! drawn in `HUD.PostRender`), so they need nothing here.
 //!
@@ -43,7 +43,7 @@ fn spawn_fade(mut commands: Commands) {
 }
 
 pub(crate) fn apply_cinema_view(
-    // Also pins this system to the main thread, where `p2game::cinema`'s thread-local lives (on a
+    // Also pins this system to the main thread, where `crate::cinema`'s thread-local lives (on a
     // worker thread `cinema()` is always None).
     sim: NonSend<Sim>,
     mut state: ResMut<CinemaViewState>,
@@ -51,7 +51,7 @@ pub(crate) fn apply_cinema_view(
     mut fade: Query<&mut BackgroundColor, With<FadeOverlay>>,
     windows: Query<&Window>,
 ) {
-    let view = p2game::cinema::cinema().and_then(|c| c.view.borrow().clone());
+    let view = crate::cinema::cinema().and_then(|c| c.view.borrow().clone());
     if std::env::var_os("P2GAME_CINEMA_TRACE").is_some() && (view.is_some() || state.active) {
         println!("CINEMA_VIEW window cam gets {:?} cams {}", view.as_ref().map(|v| (v.location, v.rotation)), cams.iter().count());
     }

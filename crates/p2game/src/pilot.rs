@@ -138,7 +138,7 @@ fn route(vm: &Vm, from: [f32; 3], to: [f32; 3]) -> Vec<[f32; 3]> {
     // static blockers): the nearest node can sit behind glass (suburbs-3 laundromat storefront,
     // BlockingVolume106 at -4030,-11188 with PathNode257 115 UU inside), and `go` walked into the
     // window. Falls back to the plain nearest nodes.
-    let walkable = |a: [f32; 3], b: [f32; 3]| p2game::physics::current().and_then(|ph| ph.world.try_borrow_mut().ok().map(|mut w| matches!(p2game::navfix::walk_test(&mut *w, Vec3::from(a), Vec3::from(b), 25.0, 69.0, 35.0), p2game::navfix::Walk::Reached))).unwrap_or(true);
+    let walkable = |a: [f32; 3], b: [f32; 3]| crate::physics::current().and_then(|ph| ph.world.try_borrow_mut().ok().map(|mut w| matches!(crate::navfix::walk_test(&mut *w, Vec3::from(a), Vec3::from(b), 25.0, 69.0, 35.0), crate::navfix::Walk::Reached))).unwrap_or(true);
     let keep = |v: Vec<(u32, f32)>, f: &dyn Fn(u32) -> bool| -> Vec<(u32, f32)> { let ok: Vec<(u32, f32)> = v.iter().copied().filter(|&(k, _)| f(k)).collect(); if ok.is_empty() { v } else { ok } };
     let starts = keep(starts, &|k| walkable(from, g.node_location(k)));
     let ends = keep(ends, &|k| walkable(g.node_location(k), to));
@@ -442,7 +442,7 @@ fn pilot(
             // `queue QStartPointN`: wait in that line like a player: stand ~90 uu behind the
             // pawn ahead (nearest pawn closer to the line start), step up as it moves, done when
             // a cashier hooks the player (PlayerController.InterestPawn set) or after 10 min.
-            let qp = p2game::demo::find_actor(vm, arg);
+            let qp = crate::demo::find_actor(vm, arg);
             let hooked = pc.and_then(|c| vm.get_prop(c, "InterestPawn")).and_then(|v| v.as_obj()).is_some();
             if hooked || qp.is_none() || t > 30 * 600 {
                 println!("PILOT@{f} queue {arg}: {}", if hooked { "hooked by cashier" } else if qp.is_none() { "no such QStartPoint" } else { "timed out" });
@@ -486,7 +486,7 @@ fn pilot(
         "face" => {
             // `face KEY` or `face X,Y,Z`.
             let fv: Vec<f32> = arg.split(',').filter_map(|s| s.trim().parse().ok()).collect();
-            let at = if fv.len() == 3 { Some([fv[0], fv[1], fv[2]]) } else { p2game::demo::find_actor(vm, arg).map(|x| vm.actor_loc(x)) };
+            let at = if fv.len() == 3 { Some([fv[0], fv[1], fv[2]]) } else { crate::demo::find_actor(vm, arg).map(|x| vm.actor_loc(x)) };
             if let Some(at) = at {
                 let d = turn_to(at, &mut motion);
                 next = d.abs() < 300 || t > 120;
@@ -507,7 +507,7 @@ fn pilot(
                 let i: usize = i.parse().ok()?;
                 vm.actors.iter().copied().filter(|&a| !vm.objects[a].deleted && vm.classes[vm.objects[a].class].name.eq_ignore_ascii_case(c)).nth(i)
             };
-            let target_of = |vm: &Vm| point.or_else(|| nth(vm).or_else(|| p2game::demo::find_actor(vm, k)).map(|x| vm.actor_loc(x)));
+            let target_of = |vm: &Vm| point.or_else(|| nth(vm).or_else(|| crate::demo::find_actor(vm, k)).map(|x| vm.actor_loc(x)));
             // A full-screen script screen (the Monday newspaper on leaving the trailer, map,
             // news) holds the player in a *Screen state: tap Space as a player would to close it,
             // and don't count the wait as being stuck.

@@ -50,7 +50,7 @@ pub(crate) fn zone_fog(sim: NonSend<Sim>, mut state: Local<ZoneFog>, mut cams: Q
     if std::env::var_os("P2VIEW_LEVEL_FOG").is_some() {
         return;
     }
-    let Some(col) = p2game::physics::level_collision() else { return };
+    let Some(col) = crate::physics::level_collision() else { return };
     let Ok((tf, mut fog)) = cams.single_mut() else { return };
     let p = tf.translation * p2view::scene::UU_PER_M;
     let zone = col.bsp.point_zone(Vec3::new(p.x, p.z, p.y));

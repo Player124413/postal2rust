@@ -10,7 +10,7 @@
 use bevy::mesh::skinning::SkinnedMeshInverseBindposes;
 use bevy::prelude::*;
 use p2anim::rig::{RigAssets, RigCache, c_mat};
-use p2game::host::{GameHost, resolve_path, skel_actor_world};
+use crate::host::{GameHost, resolve_path, skel_actor_world};
 use std::collections::{HashMap, HashSet};
 use uscript::vm::{ObjId, Value, Vm};
 
@@ -120,7 +120,7 @@ fn is_mesh_actor(vm: &Vm, a: ObjId) -> bool {
     matches!(vm.get_prop(a, "DrawType"), Some(Value::Byte(DT_MESH))) && vm.get_prop(a, "Mesh").and_then(|v| v.as_resource()).is_some()
 }
 
-use p2game::ai::render_hidden;
+use crate::ai::render_hidden;
 
 /// A rigged non-player pawn to frame with the camera (`--view-npc`): (location, rotation).
 pub fn pick_npc(vm: &Vm, tracker: &RigTracker, skip: usize) -> Option<([f32; 3], [i32; 3])> {

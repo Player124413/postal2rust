@@ -21,8 +21,8 @@
 
 use p2canvas::natives::{self, CanvasContext, MenuClasses, MenuHost};
 use p2canvas::shell::ShellNatives;
-use p2game::boot::Game;
-use p2game::host::GameHost;
+use crate::boot::Game;
+use crate::host::GameHost;
 use p2input::bevy_map::InputEvent;
 use p2input::{Bindings, Input, InputTarget, Key};
 use std::cell::RefCell;
@@ -71,7 +71,7 @@ impl Host for CanvasExt {
         // ClientTravel goes through the game host's travel request.
         if call.name.eq_ignore_ascii_case("ClientTravel") {
             // bItems: whether the player's inventory travels (travel.rs).
-            let cmd = p2game::travel::client_travel(args);
+            let cmd = crate::travel::client_travel(args);
             let h = vm.host();
             h.console_command(vm, call.this, &cmd);
             return Some(Ok(Value::Void));
@@ -185,7 +185,7 @@ impl Frontend {
         natives::register(&mut game.world.vm);
         SHELL.with(|s| *s.borrow_mut() = Some(shell.clone()));
         MATERIALS.with(|m| *m.borrow_mut() = Some(db));
-        p2game::host::register_level_hook(level_hook);
+        crate::host::register_level_hook(level_hook);
         level_hook(&game.host, &mut game.world.vm);
         Frontend { host: None, input, shell, level_key: 0, frames: 0, drive_player, menu_shown: false, map_scripts_menu: None }
     }
@@ -440,7 +440,7 @@ impl Frontend {
                     if n == 10 || (n > 0 && n % 120 == 0) {
                         let p = pawn.unwrap();
                         let l = vm.actor_loc(p);
-                        let under = p2game::physics::current().and_then(|h| {
+                        let under = crate::physics::current().and_then(|h| {
                             let mut w = h.world.borrow_mut();
                             let id = h.bridge.borrow().phys(p);
                             let hit = w.trace(glam::Vec3::from(l), glam::Vec3::from(l) - glam::Vec3::Z * 120.0, glam::Vec3::new(20.0, 20.0, 1.0), true, id)?;
@@ -455,7 +455,7 @@ impl Frontend {
                     if let (Some(p), Some(z0)) = (pawn, JUMPED.with(|j| j.take())) {
                         let l = vm.actor_loc(p);
                         if phys == Some(1) && (l[2] - z0).abs() < 2.0 {
-                            let info = p2game::physics::current().map(|h| {
+                            let info = crate::physics::current().map(|h| {
                                 let id = h.bridge.borrow().phys(p);
                                 let mut w = h.world.borrow_mut();
                                 let (r, ht) = id.and_then(|i| w.get(i).map(|a| (a.collision_radius, a.collision_height))).unwrap_or((25.0, 69.0));
@@ -505,7 +505,7 @@ impl Frontend {
                     );
                 }
                 if std::env::var_os("P2GAME_ROT_TRACE").is_some() && self.frames % 30 == 0 {
-                    let in_phys = p2game::physics::current().map(|h| h.bridge.borrow().phys(pc).is_some());
+                    let in_phys = crate::physics::current().map(|h| h.bridge.borrow().phys(pc).is_some());
                     println!("ROT@{} before {:?} after {:?} aTurn {:?} pc in physics {in_phys:?} phys {:?}", self.frames, r0, vm.get_prop(pc, "Rotation"), vm.get_prop(pc, "aTurn"), vm.get_prop(pc, "Physics"));
                 }
             }

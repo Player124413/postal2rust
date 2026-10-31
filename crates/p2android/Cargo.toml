@@ -1,0 +1,16 @@
+[package]
+name = "p2android"
+description = "Android entry point (cdylib loaded by the NativeActivity of the Android app)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+p2game = { path = "../p2game" }
+bevy = { version = "0.19", features = ["android-native-activity"] }
+# Same global allocator as the desktop binary (the VM allocates a lot).
+mimalloc = { version = "0.1", default-features = false }

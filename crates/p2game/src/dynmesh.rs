@@ -11,7 +11,7 @@ use bevy::asset::RenderAssetUsages;
 use bevy::mesh::{Indices, PrimitiveTopology};
 use bevy::prelude::*;
 use p2anim::rig::{c_mat, make_image, to_bevy};
-use p2game::host::{actor_world, resolve_path};
+use crate::host::{actor_world, resolve_path};
 use std::collections::{HashMap, HashSet};
 use upkg::library::{Library, Obj};
 use upkg::texture::read_texture;
@@ -192,7 +192,7 @@ impl DynMeshTracker {
             return;
         }
         let lib = lib.clone();
-        let coll = p2game::physics::level_collision();
+        let coll = crate::physics::level_collision();
         self.ahead_coll = coll.clone();
         let t0 = std::time::Instant::now();
         let h = std::thread::Builder::new().name("bake-ahead".into()).spawn(move || {
@@ -582,7 +582,7 @@ pub fn update(
     if let (false, Some(lit)) = (bakes.is_empty(), tracker.lighting.clone()) {
         // Bake-ahead results for jobs whose inputs match exactly; the rest are baked here.
         tracker.take_ahead();
-        let coll = p2game::physics::level_collision();
+        let coll = crate::physics::level_collision();
         let mut colors_for: Vec<Option<Vec<[f32; 4]>>> = Vec::with_capacity(bakes.len());
         let mut todo: Vec<BakeJob> = Vec::new();
         for (job, _) in &bakes {
@@ -636,7 +636,7 @@ pub fn update(
             }
             return false;
         }
-        let hidden = p2game::ai::render_hidden(vm, a);
+        let hidden = crate::ai::render_hidden(vm, a);
         // Most of these never move (pickups lying in the level): skip the entity updates while
         // the actor's location, rotation, scale and visibility are unchanged.
         let key = (vm.actor_loc(a), vm.actor_rot(a), vm.get_prop(a, "DrawScale").map(|v| v.as_float().to_bits()), hidden);

@@ -951,7 +951,7 @@ fn pickable(vm: &Vm, a: ObjId) -> bool {
     if vm.class_is_a(c, "Pawn") || vm.class_is_a(c, "Pickup") || vm.class_is_a(c, "KActor") || vm.class_is_a(c, "Mover") {
         return true;
     }
-    if p2game::ai::render_hidden(vm, a) {
+    if crate::ai::render_hidden(vm, a) {
         return false;
     }
     matches!(vm.get_prop(a, "DrawType").map(|v| v.as_int()), Some(2) | Some(8))
@@ -1452,7 +1452,7 @@ fn run(vm: &mut Vm, pc: ObjId, c: &str, st: &mut DevState) {
 /// relative to the values loaded with the map (remembered the first time).
 fn set_physics_gravity(scale: f32) {
     thread_local!(static BASE: std::cell::RefCell<Option<(usize, Vec<(p2physics::ActorId, bevy::math::Vec3)>, bevy::math::Vec3)>> = const { std::cell::RefCell::new(None) });
-    let Some(ph) = p2game::physics::current() else { return };
+    let Some(ph) = crate::physics::current() else { return };
     let mut w = ph.world.borrow_mut();
     let key = std::rc::Rc::as_ptr(&ph) as usize;
     BASE.with(|b| {
@@ -1506,7 +1506,7 @@ fn spawn(vm: &mut Vm, class: &str, at: [f32; 3], pc: ObjId) -> Option<ObjId> {
 }
 
 /// Where the crosshair points (camera ray against the world), pulled back `back` units.
-fn crosshair(vm: &mut Vm, host: &p2game::host::GameHost, pc: ObjId, cam: Option<(Vec3, Vec3)>, back: f32) -> Option<[f32; 3]> {
+fn crosshair(vm: &mut Vm, host: &crate::host::GameHost, pc: ObjId, cam: Option<(Vec3, Vec3)>, back: f32) -> Option<[f32; 3]> {
     let (o, d) = match cam {
         Some((p, f)) => (p * UU_PER_M, f),
         None => return None,
@@ -1524,7 +1524,7 @@ fn crosshair(vm: &mut Vm, host: &p2game::host::GameHost, pc: ObjId, cam: Option<
 }
 
 /// Moves an actor without sweeping (the editor places things where it's told), zeroing motion.
-fn place(vm: &mut Vm, host: &p2game::host::GameHost, a: ObjId, to: [f32; 3]) {
+fn place(vm: &mut Vm, host: &crate::host::GameHost, a: ObjId, to: [f32; 3]) {
     if !host.move_actor(vm, a, to, false) {
         vm.set_prop(a, "Location", Value::Vector(to));
     }

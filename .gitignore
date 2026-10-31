@@ -9,3 +9,11 @@ out_*.txt
 out_*.patch 
 out_*.diff 
 out_*.png 
+# Android build outputs (the native library is built into jniLibs by CI or cargo-ndk)
+android/app/src/main/jniLibs/
+android/app/build/
+android/build/
+android/.gradle/
+android/.kotlin/
+android/local.properties
+!android/app/keystore/debug.keystore

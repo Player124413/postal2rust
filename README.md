@@ -113,6 +113,10 @@ Known differences from the original, roughly by impact:
 - POSTAL 2: Paradise Lost (out of scope).
 - Linux and macOS builds are produced by CI but have had little testing so far; please report problems.
 
+## Android (debug APK)
+
+An Android port (launcher app, touch controls with a layout editor, 60 FPS by default, 64-bit phones) is in [`android/`](android/README.md). It is built by the **android-debug** workflow; updates install over the previous build without uninstalling.
+
 ## Building from source
 
 Windows, Rust stable with the `x86_64-pc-windows-gnullvm` target and [llvm-mingw](https://github.com/mstorsjo/llvm-mingw) (no Visual Studio needed). `tools/cargo.bat` wraps cargo with that toolchain; edit the paths at its top for your machine.

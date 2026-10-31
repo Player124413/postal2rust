@@ -16,9 +16,9 @@ use bevy::input::mouse::AccumulatedMouseMotion;
 use bevy::math::{Affine3A, Mat3, Vec3};
 use bevy::prelude::*;
 use bevy::render::view::screenshot::{Screenshot, save_to_disk};
-use p2game::boot::Game;
-use p2game::config::BootConfig;
-use p2game::level::World as P2World;
+use crate::boot::Game;
+use crate::config::BootConfig;
+use crate::level::World as P2World;
 use p2view::{outdoor, scene, spawn};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -87,7 +87,7 @@ fn pose_with(vm: &uscript::vm::Vm, a: ObjId, sl: &PoseSlots) -> Pose {
             if get(4).is_some_and(|v| v.as_bool()) {
                 true
             } else if on_bone {
-                p2game::ai::render_hidden(vm, a)
+                crate::ai::render_hidden(vm, a)
             } else {
                 false
             }
@@ -189,28 +189,28 @@ pub fn run(cfg: BootConfig, args: Args) {
     let unlit = a.iter().any(|x| x == "--unlit");
     let view_npc = a.iter().position(|x| x == "--view-npc").map(|i| a.get(i + 1).and_then(|s| s.parse().ok()).unwrap_or(0));
     let url = args.map.clone().unwrap_or_else(|| cfg.startup_map.clone());
-    let (map, url_opts) = p2game::boot::split_url(&url);
+    let (map, url_opts) = crate::boot::split_url(&url);
     let mut options = format!("{url_opts}{}", args.options);
     // Scripted test runs (any automation env or --profile-secs/--screenshot) start on Monday
     // (`SetDay=1`, P2GameInfoSingle's 1-based ForceDayOnStartup) unless a day was given, so
     // benchmarks and screenshots see the same day every time. `P2GAME_TEST_DAY=N` picks another.
     let scripted = ["P2GAME_MUTE", "P2GAME_SHOTS", "P2GAME_EXIT", "P2GAME_EXIT_SECS", "P2GAME_EXEC", "P2GAME_REAL", "P2GAME_PILOT", "P2GAME_DEMO_GOTO"].iter().any(|v| std::env::var_os(v).is_some())
         || a.iter().any(|x| x == "--profile-secs" || x == "--screenshot");
-    if scripted && args.map.is_some() && args.game_class.is_none() && p2game::boot::url_option(&options, "Game").is_none() {
+    if scripted && args.map.is_some() && args.game_class.is_none() && crate::boot::url_option(&options, "Game").is_none() {
         // A bare `--map` picks the map's default game (AWPGameInfo on suburbs-3: the weekend,
         // which has no Monday). Tests play the classic week.
         options.push_str("?Game=GameTypes.GameSinglePlayer");
     }
-    if scripted && p2game::boot::url_option(&options, "SetDay").is_none() {
+    if scripted && crate::boot::url_option(&options, "SetDay").is_none() {
         let day = std::env::var("P2GAME_TEST_DAY").ok().and_then(|s| s.parse::<i32>().ok()).unwrap_or(1);
         options.push_str(&format!("?SetDay={day}"));
     }
-    let game_class = args.game_class.clone().or_else(|| p2game::boot::url_option(&options, "Game"));
+    let game_class = args.game_class.clone().or_else(|| crate::boot::url_option(&options, "Game"));
 
     // Script world first: if the map cannot boot there is nothing to show.
     let mut world = P2World::new(cfg).unwrap_or_else(|e| panic!("VM init failed: {e}"));
     let pkg = open_map(&world, &map).unwrap_or_else(|| panic!("map {map} not found"));
-    p2game::physics::prefetch(world.library(), pkg.clone());
+    crate::physics::prefetch(world.library(), pkg.clone());
     let level = world.load_level(pkg);
     println!("{map}: {} actors instantiated ({:.2} s since boot)", level.stats.actors, boot_secs());
     let mut game = Game::new(world, level, game_class.as_deref());
@@ -254,7 +254,7 @@ pub fn run(cfg: BootConfig, args: Args) {
     println!("load: ui/weapons installed ({:.2} s since boot)", boot_secs());
     // Particles, fluids and decals from script (fx_glue.rs): the VM side pushes a snapshot per frame.
     let fxq = p2fx::FxFrameQueue::default();
-    p2game::fx_glue::set_frame_queue(fxq.0.clone());
+    crate::fx_glue::set_frame_queue(fxq.0.clone());
     app.add_plugins((p2fx::FxPlugin, p2fx::FxVmPlugin)).insert_resource(fxq).insert_resource(p2fx::render_vm::FxFirstPersonLayer(Some(crate::weapons::FP_LAYER)));
     app.add_plugins(crate::ui::UiPlugin)
         .add_plugins(crate::debug::DebugOverlayPlugin)
@@ -263,6 +263,7 @@ pub fn run(cfg: BootConfig, args: Args) {
         .add_plugins(crate::cinema_view::CinemaViewPlugin)
         .add_plugins(crate::weapons::WeaponsPlugin)
         .add_plugins(crate::realinput::RealInputPlugin)
+        .add_plugins(crate::touch::TouchPlugin)
         .add_plugins(crate::pilot::PilotPlugin)
         .add_plugins(crate::tour::TourPlugin)
         .add_plugins(outdoor::OutdoorPlugin)
@@ -310,7 +311,7 @@ pub fn run(cfg: BootConfig, args: Args) {
     crate::sampler::finish();
     crate::cursor::release_cursor();
     // Close the audio stream while the process is still whole (see `audio::shutdown_device`).
-    p2game::audio::shutdown_device();
+    crate::audio::shutdown_device();
 }
 
 /// `P2GAME_RENDER_PROBE=1`: laps between the render sub-app's system sets; prints a breakdown for
@@ -491,8 +492,8 @@ fn travel(
     let sim = &mut *sim;
     // `?load=N` (no map): the Load Game menu asks for a save slot, not a level.
     if map.split('#').next().unwrap_or("").is_empty() {
-        match p2game::boot::url_option(&opts, "load").and_then(|s| s.trim_end_matches('#').parse::<i32>().ok()) {
-            Some(n) => p2game::save::request_load(n),
+        match crate::boot::url_option(&opts, "load").and_then(|s| s.trim_end_matches('#').parse::<i32>().ok()) {
+            Some(n) => crate::save::request_load(n),
             None => eprintln!("travel with no map and no ?load: ignored ({opts})"),
         }
         return;
@@ -718,7 +719,7 @@ fn tick_script(time: Res<Time>, keys: Res<ButtonInput<KeyCode>>, ui: Res<crate::
     sim.game.drain_log(false);
     // SaveGame / LoadGame console commands (a load replaces the level: rebuild the scene).
     let t_save = std::time::Instant::now();
-    for l in p2game::save::process_requests(&mut sim.game) {
+    for l in crate::save::process_requests(&mut sim.game) {
         println!("{l} ({:.0} ms)", t_save.elapsed().as_secs_f64() * 1000.0);
         if l.starts_with("LoadGame") && !l.contains("failed") {
             sim.loaded_save = true;
@@ -1145,8 +1146,8 @@ fn report(
             sim.moved_total,
             vm.missing_natives.values().sum::<u64>(),
             vm.script_errors.values().sum::<u64>(),
-            p2game::physics::NAV_STUCK.with(|c| c.get()),
-            p2game::physics::NAV_DEFLECT.with(|c| c.get())
+            crate::physics::NAV_STUCK.with(|c| c.get()),
+            crate::physics::NAV_DEFLECT.with(|c| c.get())
         );
         // Frame time split: game phases (script, anim, each frame hook) vs the whole frame.
         let frame_ms = span * 1000.0 / fr.wall_frames.max(1) as f64;

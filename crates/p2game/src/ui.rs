@@ -268,7 +268,7 @@ pub(crate) fn hide_own_body(sim: NonSend<Sim>, ui: Res<UiInput>, rigs: Query<&cr
     // A running Matinee scene owns the camera: the Dude is filmed from outside (intro
     // TrailerScene2 / DudeHeadsOut walks him out of the trailer) while his controller's
     // ViewTarget stays the pawn, so his body must stay visible.
-    if p2game::cinema::cinema().is_some_and(|c| c.view.borrow().is_some()) {
+    if crate::cinema::cinema().is_some_and(|c| c.view.borrow().is_some()) {
         return;
     }
     let Some(pawn) = vm.get_prop(pc, "Pawn").and_then(|v| v.as_obj()) else { return };
@@ -300,7 +300,7 @@ pub(crate) fn hide_own_body(sim: NonSend<Sim>, ui: Res<UiInput>, rigs: Query<&cr
 /// `size_factor` of the screen width wide (aspect kept), in its render style with the title's
 /// colour and alpha.
 fn draw_scene_titles(w: i32, h: i32) {
-    let Some(view) = p2game::cinema::cinema().and_then(|c| c.view.borrow().clone()) else { return };
+    let Some(view) = crate::cinema::cinema().and_then(|c| c.view.borrow().clone()) else { return };
     if view.titles.is_empty() {
         return;
     }

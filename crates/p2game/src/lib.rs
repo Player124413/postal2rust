@@ -29,6 +29,55 @@ pub mod subtitles;
 pub mod travel;
 pub mod viewport;
 
+// The host (moved here from the binary so that the Android library can share it).
+pub mod app;
+pub mod launch;
+pub mod sampler;
+#[cfg(feature = "window")]
+pub mod cinema_view;
+#[cfg(feature = "window")]
+pub mod cursor;
+#[cfg(feature = "window")]
+pub mod debug;
+#[cfg(feature = "window")]
+pub mod devmenu;
+#[cfg(feature = "window")]
+pub mod frontend;
+#[cfg(feature = "window")]
+pub mod progress;
+#[cfg(feature = "window")]
+pub mod tour;
+#[cfg(feature = "window")]
+pub mod realinput;
+#[cfg(feature = "window")]
+pub mod pilot;
+#[cfg(feature = "window")]
+pub mod rigs;
+#[cfg(feature = "window")]
+pub mod dynmesh;
+#[cfg(feature = "window")]
+pub mod smoke;
+#[cfg(feature = "window")]
+pub mod ui;
+#[cfg(feature = "window")]
+pub mod settings;
+#[cfg(feature = "window")]
+pub mod splash;
+#[cfg(feature = "window")]
+pub mod weapons;
+#[cfg(feature = "window")]
+pub mod window;
+#[cfg(feature = "window")]
+pub mod window_memory;
+#[cfg(feature = "window")]
+pub mod zone_fog;
+#[cfg(feature = "window")]
+pub mod touch;
+
+#[cfg(feature = "window")]
+pub(crate) use app::map_list;
+pub use app::{Args, open_map};
+
 use std::path::PathBuf;
 
 /// Game root: `--game`, `POSTAL2_DIR`, a `postal2dir.txt` next to the exe (one line, the install
@@ -51,9 +100,19 @@ pub fn is_install(p: &std::path::Path) -> bool {
     upkg::ci::join(&s, "Postal2.ini").is_file() || upkg::ci::join(&s, "Default.ini").is_file() && upkg::ci::join(&s, "Engine.u").is_file()
 }
 
+/// Folder for files the player owns next to the game (the Android app's external files folder,
+/// set by the Android entry as `P2GAME_DATA_DIR`). None on desktop: the exe's own folder is used.
+pub fn data_dir() -> Option<PathBuf> {
+    std::env::var_os("P2GAME_DATA_DIR").filter(|d| !d.is_empty()).map(PathBuf::from)
+}
+
+/// The Android launcher copies POSTAL 2 into `<data dir>/POSTAL2`; that is looked at first.
 pub fn find_install() -> Option<PathBuf> {
     let mut cands: Vec<PathBuf> = Vec::new();
-    let exe_dir = std::env::current_exe().ok().and_then(|e| e.parent().map(|p| p.to_path_buf()));
+    if let Some(d) = data_dir() {
+        cands.push(d.join("POSTAL2"));
+    }
+    let exe_dir = if data_dir().is_some() { None } else { std::env::current_exe().ok().and_then(|e| e.parent().map(|p| p.to_path_buf())) };
     if let Some(dir) = &exe_dir {
         if let Ok(s) = std::fs::read_to_string(dir.join("postal2dir.txt")) {
             if let Some(line) = s.lines().map(str::trim).find(|l| !l.is_empty()) {

@@ -146,7 +146,7 @@ pub(crate) fn update_overlay(
         let u = t.translation * p2view::scene::UU_PER_M;
         let _ = writeln!(s, "camera {:.0} {:.0} {:.0}", u.x, u.z, u.y);
     }
-    if let Some(c) = p2game::cinema::cinema() {
+    if let Some(c) = crate::cinema::cinema() {
         let st = c.stats.borrow().clone();
         match c.view.borrow().as_ref() {
             Some(v) => {

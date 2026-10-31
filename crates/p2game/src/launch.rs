@@ -13,11 +13,19 @@ use std::path::{Path, PathBuf};
 const TITLE: &str = "Postal 2 Rust/Bevy";
 
 fn exe_dir() -> PathBuf {
+    // Android: the app's own data folder (the exe lives in a read-only, system-managed folder).
+    if let Some(d) = crate::data_dir() {
+        return d;
+    }
     std::env::current_exe().ok().and_then(|e| e.parent().map(Path::to_path_buf)).unwrap_or_else(|| PathBuf::from("."))
 }
 
 /// True for the shipped, player-facing exe (renamed from `p2game.exe`).
 pub fn shipped() -> bool {
+    // The Android build is started by its own launcher, never as a renamed exe.
+    if cfg!(target_os = "android") {
+        return false;
+    }
     std::env::current_exe().ok().and_then(|e| e.file_stem().map(|s| !s.eq_ignore_ascii_case("p2game"))).unwrap_or(false)
 }
 
@@ -60,16 +68,16 @@ fn saved_file() -> PathBuf {
 /// A picked folder as the install root: the install itself, its `System` folder, or a folder
 /// directly containing it (e.g. `steamapps\common`).
 fn normalise(p: &Path) -> Option<PathBuf> {
-    if p2game::is_install(p) {
+    if crate::is_install(p) {
         return Some(p.to_path_buf());
     }
     if p.file_name().is_some_and(|n| n.eq_ignore_ascii_case("System")) {
         // Picked the System folder itself.
-        if let Some(parent) = p.parent().filter(|q| p2game::is_install(q)) {
+        if let Some(parent) = p.parent().filter(|q| crate::is_install(q)) {
             return Some(parent.to_path_buf());
         }
     }
-    std::fs::read_dir(p).ok()?.filter_map(|e| e.ok()).map(|e| e.path()).find(|c| p2game::is_install(c))
+    std::fs::read_dir(p).ok()?.filter_map(|e| e.ok()).map(|e| e.path()).find(|c| crate::is_install(c))
 }
 
 /// The install root for this run (see the module docs). None: the player cancelled.
@@ -80,7 +88,7 @@ pub fn resolve_root(a: &[String], game_flag: Option<&str>) -> Option<PathBuf> {
     if let Ok(d) = std::env::var("POSTAL2_DIR") {
         return Some(PathBuf::from(d));
     }
-    let found = p2game::find_install();
+    let found = crate::find_install();
     if !has(a, "--change-folder") {
         if let Some(f) = &found {
             return Some(f.clone());

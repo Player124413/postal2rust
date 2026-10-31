@@ -11,7 +11,7 @@
 //! `StartNextDayURL`), so whatever the install routes to (weekend days included) is followed.
 
 use crate::frontend::{FrameInput, Frontend};
-use p2game::boot::Game;
+use crate::boot::Game;
 use p2input::bevy_map::InputEvent;
 use p2input::{Action, Key};
 use std::collections::BTreeMap;
@@ -120,7 +120,7 @@ pub(crate) fn run(mut game: Game, game_root: &std::path::Path, out_dir: &std::pa
     for frame in 0..max_frames {
         game.tick(dt);
         game.drain_log(false);
-        let _ = p2game::save::process_requests(&mut game);
+        let _ = crate::save::process_requests(&mut game);
         let evs = std::mem::take(&mut events);
         let out = front.frame(&mut game, FrameInput { events: &evs, typed: &[], mouse: None, width: w, height: h, dt });
         let _ = out;
