@@ -1,6 +1,8 @@
 package com.postal2rust.game
 
 import android.app.AlertDialog
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -20,6 +22,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.FileProvider
 import androidx.documentfile.provider.DocumentFile
 import java.io.File
 import java.io.FileOutputStream
@@ -70,6 +73,57 @@ class LauncherActivity : ComponentActivity() {
     private fun dataDir(): File = getExternalFilesDir(null) ?: filesDir
 
     private fun gameDir(): File = File(dataDir(), "POSTAL2")
+
+    /** Written by the native side (`android_log.rs`): game.txt, logcat.txt, crash.txt and *-previous. */
+    private fun logsDir(): File = File(dataDir(), "logs")
+
+    private fun hasLogs(): Boolean = logsDir().isDirectory && (logsDir().listFiles()?.isNotEmpty() == true)
+
+    // ---- logs -------------------------------------------------------------------------------
+
+    private fun shareLog() {
+        if (!hasLogs()) {
+            toast("Логов пока нет: сначала запустите игру")
+            return
+        }
+        Thread {
+            try {
+                val file = GameLogs.bundle(this, logsDir())
+                val uri = FileProvider.getUriForFile(this, "$packageName.logs", file)
+                ui.post {
+                    val send = Intent(Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(Intent.EXTRA_STREAM, uri)
+                        putExtra(Intent.EXTRA_SUBJECT, "POSTAL 2 Rust: лог")
+                        clipData = ClipData.newRawUri("log", uri)
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    startActivity(Intent.createChooser(send, "Отправить лог"))
+                }
+            } catch (e: Exception) {
+                ui.post { toast("Не удалось подготовить лог: ${e.message}") }
+            }
+        }.start()
+    }
+
+    private fun copyLog() {
+        if (!hasLogs()) {
+            toast("Логов пока нет: сначала запустите игру")
+            return
+        }
+        Thread {
+            try {
+                val text = GameLogs.tailText(this, logsDir(), COPY_CHARS)
+                ui.post {
+                    val clipboard = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+                    clipboard.setPrimaryClip(ClipData.newPlainText("postal2rust-log", text))
+                    toast("Скопировано ${text.length} символов: конец лога")
+                }
+            } catch (e: Exception) {
+                ui.post { toast("Не удалось скопировать лог: ${e.message}") }
+            }
+        }.start()
+    }
 
     private fun isInstalled(dir: File): Boolean =
         File(dir, "System/Postal2.ini").isFile || File(dir, "System/Default.ini").isFile
@@ -124,6 +178,14 @@ class LauncherActivity : ComponentActivity() {
             text("60 FPS — цель по умолчанию: одинаково ровно на всех телефонах. 90 и 120 — для экранов с высокой частотой, но тяжелее для батареи и температуры.", 12f),
             spaced(top = 4),
         )
+
+        column.addView(text("Лог для отчёта об ошибке", 15f, bold = true), spaced(top = 22))
+        column.addView(
+            text("Если игра вылетела, отправьте лог: в нём запуск, сообщения игры и текст ошибки. Папка логов: ${logsDir().absolutePath}", 12f),
+            spaced(top = 4),
+        )
+        column.addView(button("Отправить лог") { shareLog() }, spaced(top = 6))
+        column.addView(button("Скопировать конец лога в буфер") { copyLog() }, spaced(top = 6))
 
         deleteButton = button("Удалить копию игры из приложения") { confirmDelete() }
         column.addView(deleteButton, spaced(top = 22))
@@ -319,5 +381,7 @@ class LauncherActivity : ComponentActivity() {
     companion object {
         private const val KEY_FPS = "fps"
         private val FPS_VALUES = listOf(30, 60, 90, 120)
+        /** How much of the log goes to the clipboard (the full log is in the shared file). */
+        private const val COPY_CHARS = 100_000
     }
 }

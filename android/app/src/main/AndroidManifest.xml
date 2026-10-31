@@ -24,6 +24,17 @@
             </intent-filter>
         </activity>
 
+        <!-- Shares the log file (cache/logs) with other apps, read-only and only for the duration of a share. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.logs"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/log_paths" />
+        </provider>
+
         <!-- The game itself: Bevy runs in the native library p2android (libp2android.so). -->
         <activity
             android:name="android.app.NativeActivity"

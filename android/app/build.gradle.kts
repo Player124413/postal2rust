@@ -71,4 +71,5 @@ android {
 dependencies {
     implementation("androidx.activity:activity:1.9.3")
     implementation("androidx.documentfile:documentfile:1.0.1")
+    implementation("androidx.core:core:1.13.1")
 }

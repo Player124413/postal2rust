@@ -31,6 +31,8 @@ pub mod viewport;
 
 // The host (moved here from the binary so that the Android library can share it).
 pub mod app;
+#[cfg(target_os = "android")]
+pub mod android_log;
 pub mod launch;
 pub mod sampler;
 #[cfg(feature = "window")]

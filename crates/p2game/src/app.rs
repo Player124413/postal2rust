@@ -523,6 +523,8 @@ fn boot_all(cfg: BootConfig, args: &Args) {
 /// launcher's files: `android.cfg` (`fps=N`) and the `start_touch_editor` flag.
 #[cfg(target_os = "android")]
 pub fn android_main(data_dir: PathBuf) {
+    // First, so that everything after this (including a crash) ends up in `<data>/logs/`.
+    crate::android_log::start(&data_dir);
     // Before any thread is started (this is the first call of the process).
     // SAFETY: single-threaded start-up.
     unsafe {
