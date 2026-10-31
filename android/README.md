@@ -89,3 +89,28 @@ The launcher hands over settings through two small files in the app folder: `and
   is a separate task and is only needed if memory is short. Source: the
   [Android developer guide on texture compression](https://developer.android.com/guide/playcore/asset-delivery/texture-compression).
 - Only `arm64-v8a` is built. Emulators on x86_64 hosts need an extra ABI.
+
+## Known problem: native crash on Honor ALI-NX1 (Adreno 710)
+
+Status: **not solved**. The game starts, reaches the first frames of the level, then the process
+dies with SIGSEGV (null pointer dereference). The crashing thread changes from run to run, which
+points to memory corruption in the GPU driver rather than a bug in the game code.
+
+Ruled out so far:
+- mimalloc: the crash also happens with Bevy's system allocator.
+- Audio: the crash also happens with `audio=off` (no OS audio device).
+- Bindless texture arrays: disabled on Android, the crash remains.
+- Asynchronous pipeline compilation: disabled on Android, the crash remains.
+- BC (DXT) textures on the GPU: disabled on Android (decoded to RGBA8 on the CPU). One run survived
+  about 13 seconds afterwards, the next one still crashed.
+- Empty Bevy scene (the launcher button «Диагностика: пустая сцена»): works, so the device and the Vulkan
+  driver can draw a frame.
+- OpenGL ES: no GPU is found when the renderer starts, because Bevy creates the renderer before the
+  Android window exists and OpenGL needs a surface to pick an adapter (`bevy_render`,
+  `renderer/mod.rs`). Vulkan does not need one.
+
+Diagnostic switches in the launcher (saved in `android.cfg`): graphics backend, audio on/off,
+empty scene. Logs: "Отправить лог" in the launcher; the native crash is also in `exit.txt`.
+
+Not yet tried: removing game features one by one (fog, colour grading, particles, the HUD canvas)
+to find the one the driver does not survive.
