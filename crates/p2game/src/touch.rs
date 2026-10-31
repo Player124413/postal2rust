@@ -253,7 +253,7 @@ fn panel_width(w: f32) -> f32 {
 
 fn panel_bg(w: f32, h: f32) -> Area {
     let pw = panel_width(w);
-    Area::new(w - pw - 18.0, 68.0, w - 6.0, (68.0 + 330.0).min(h - 6.0))
+    Area::new(w - pw - 18.0, 68.0, w - 6.0, (68.0_f32 + 330.0).min(h - 6.0))
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
