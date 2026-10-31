@@ -69,7 +69,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: android-arm64-release
-      - name: Build libp2android.so (release profile: the game code is optimized even in the debug APK)
+      - name: "Build libp2android.so (release profile, so the game code is optimized in the debug APK)"
         run: cargo ndk -t arm64-v8a -P 26 -o android/app/src/main/jniLibs build -p p2android --profile release
       - uses: gradle/actions/setup-gradle@v4
         with:
