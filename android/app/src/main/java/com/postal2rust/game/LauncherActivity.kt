@@ -49,6 +49,7 @@ class LauncherActivity : ComponentActivity() {
     private lateinit var editorButton: Button
     private lateinit var fpsSpinner: Spinner
     private lateinit var backendButton: Button
+    private lateinit var soundButton: Button
 
     @Volatile private var copying = false
     @Volatile private var cancelCopy = false
@@ -201,6 +202,13 @@ class LauncherActivity : ComponentActivity() {
             writeConfig()
         }
         column.addView(backendButton, spaced(top = 4))
+        soundButton = button(soundLabel()) {
+            val next = !prefs().getBoolean(KEY_SOUND, true)
+            prefs().edit().putBoolean(KEY_SOUND, next).apply()
+            soundButton.text = soundLabel()
+            writeConfig()
+        }
+        column.addView(soundButton, spaced(top = 6))
         column.addView(button("Диагностика: пустая сцена Bevy (без игры)") { playEmptyScene() }, spaced(top = 6))
         column.addView(
             text("Если пустая сцена тоже падает — проблема в устройстве или драйвере. Если работает — в игре.", 12f),
@@ -387,6 +395,10 @@ class LauncherActivity : ComponentActivity() {
         startActivity(Intent(this, android.app.NativeActivity::class.java))
     }
 
+    private fun soundLabel(): String =
+        if (prefs().getBoolean(KEY_SOUND, true)) "Звук: включён (нажмите, чтобы выключить для проверки)"
+        else "Звук: выключен (для проверки падения)"
+
     private fun backendLabel(): String =
         if (prefs().getString(KEY_BACKEND, "vulkan") == "gl") "Графика: OpenGL ES (нажмите, чтобы вернуть Vulkan)"
         else "Графика: Vulkan (по умолчанию, нажмите для OpenGL ES)"
@@ -395,7 +407,8 @@ class LauncherActivity : ComponentActivity() {
     private fun writeConfig() {
         val fps = prefs().getInt(KEY_FPS, 60)
         val backend = prefs().getString(KEY_BACKEND, "vulkan")
-        File(dataDir(), "android.cfg").writeText("# written by the launcher\nfps=$fps\nbackend=$backend\n")
+        val audio = if (prefs().getBoolean(KEY_SOUND, true)) "on" else "off"
+        File(dataDir(), "android.cfg").writeText("# written by the launcher\nfps=$fps\nbackend=$backend\naudio=$audio\n")
     }
 
     // ---- helpers ----------------------------------------------------------------------------
@@ -426,6 +439,7 @@ class LauncherActivity : ComponentActivity() {
     companion object {
         private const val KEY_FPS = "fps"
         private const val KEY_BACKEND = "backend"
+        private const val KEY_SOUND = "sound"
         private val FPS_VALUES = listOf(30, 60, 90, 120)
         /** How much of the log goes to the clipboard (the full log is in the shared file). */
         private const val COPY_CHARS = 100_000

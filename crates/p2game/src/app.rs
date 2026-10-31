@@ -539,6 +539,11 @@ pub fn android_main(data_dir: PathBuf) {
                 unsafe { std::env::set_var("P2GAME_FPS_LIMIT", v) };
             }
             // `backend=gl` runs the renderer on OpenGL ES instead of Vulkan (wgpu reads WGPU_BACKEND).
+            // `audio=off` runs without the OS audio device (diagnostics).
+            if line.trim() == "audio=off" {
+                // SAFETY: as above.
+                unsafe { std::env::set_var("P2GAME_NO_AUDIO", "1") };
+            }
             if line.trim() == "backend=gl" {
                 // SAFETY: as above.
                 unsafe { std::env::set_var("WGPU_BACKEND", "gl") };

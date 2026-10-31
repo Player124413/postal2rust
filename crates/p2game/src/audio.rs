@@ -114,6 +114,11 @@ thread_local! {
 /// Falls back to a silent engine (with a message) when no device is available.
 #[cfg(feature = "window")]
 pub fn install_with_device(game_dir: PathBuf) -> Rc<Audio> {
+    // Diagnostics (Android launcher switch): run without the OS audio device.
+    if std::env::var_os("P2GAME_NO_AUDIO").is_some() {
+        println!("audio: off (P2GAME_NO_AUDIO)");
+        return install(game_dir, None);
+    }
     match p2sound::device::AudioOutput::open() {
         Ok(out) => {
             let engine = out.engine.clone();
