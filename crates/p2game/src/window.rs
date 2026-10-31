@@ -237,17 +237,16 @@ pub fn run(cfg: BootConfig, args: Args) {
         tp.io.on_thread_spawn = Some(hook());
         plugins = plugins.set(bevy::app::TaskPoolPlugin { task_pool_options: tp });
     }
-    if std::env::var_os("P2VIEW_NO_BINDLESS").is_some() {
-        // A/B: per-material bind groups for every material (no texture binding arrays), as before
-        // the baked materials went bindless.
+    // Android: no texture binding arrays (the baked materials then use one bind group each, as on
+    // desktop with P2VIEW_NO_BINDLESS=1), and pipelines compiled on the calling thread. The Adreno
+    // driver crashed (SIGSEGV) in its shader compiler on the async compute pool, and the crash
+    // came with the bindless path. Both are A/B switches; desktop keeps Bevy's defaults.
+    let android = cfg!(target_os = "android");
+    if std::env::var_os("P2VIEW_NO_BINDLESS").is_some() || android {
         let wgpu = bevy::render::settings::WgpuSettings { disabled_features: Some(bevy::render::settings::WgpuFeatures::TEXTURE_BINDING_ARRAY), ..default() };
-        // Android: pipelines are compiled on the calling thread. The Adreno driver crashed inside its
-        // shader compiler when Bevy compiled a pipeline on the async compute pool (SIGSEGV in
-        // vkCreateGraphicsPipelines, logs of 23:33 on build 29).
-        let sync_pipelines = cfg!(target_os = "android");
         plugins = plugins.set(bevy::render::RenderPlugin {
             render_creation: wgpu.into(),
-            synchronous_pipeline_compilation: sync_pipelines,
+            synchronous_pipeline_compilation: android,
             ..default()
         });
     }
