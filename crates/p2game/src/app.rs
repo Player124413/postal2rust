@@ -31,10 +31,10 @@ fn has(a: &[String], f: &str) -> bool {
 
 pub fn main_entry() {
     let a: Vec<String> = std::env::args().skip(1).collect();
-    launch::prepare(&a);
+    crate::launch::prepare(&a);
     // The shipped exe asks for the install folder when it cannot find one (or on --change-folder).
-    let root = if launch::shipped() || has(&a, "--change-folder") {
-        match launch::resolve_root(&a, flag(&a, "--game").as_deref()) {
+    let root = if crate::launch::shipped() || has(&a, "--change-folder") {
+        match crate::launch::resolve_root(&a, flag(&a, "--game").as_deref()) {
             Some(r) => r,
             None => {
                 println!("No POSTAL 2 folder selected.");
@@ -61,8 +61,8 @@ pub fn main_entry() {
             args.root.display()
         );
         eprintln!("{msg}");
-        if launch::shipped() {
-            launch::message(&msg, false);
+        if crate::launch::shipped() {
+            crate::launch::message(&msg, false);
         } else {
             #[cfg(windows)]
             {
@@ -149,7 +149,7 @@ pub fn main_entry() {
         let mut game = Game::new(world, lv, Some(&gc));
         game.begin_play(&format!("{opts}{}", args.options));
         game.drain_log(false);
-        std::process::exit(progress::run(game, &args.root, &args.out, max, last_day));
+        std::process::exit(crate::progress::run(game, &args.root, &args.out, max, last_day));
     }
     #[cfg(feature = "window")]
     if has(&a, "--smoke") && !has(&a, "--windowed") {
@@ -167,11 +167,11 @@ pub fn main_entry() {
         let mut game = Game::new(world, lv, gc.as_deref());
         game.begin_play(&format!("{opts}{}", args.options));
         game.drain_log(false);
-        std::process::exit(smoke::run(game, &args.root, &args.out, intro, max));
+        std::process::exit(crate::smoke::run(game, &args.root, &args.out, intro, max));
     }
     #[cfg(feature = "window")]
     {
-        window::run(cfg, args);
+        crate::window::run(cfg, args);
     }
     #[cfg(not(feature = "window"))]
     {

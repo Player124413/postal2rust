@@ -50,7 +50,7 @@ jobs:
         shell: bash
         run: |
           for f in ci-logs/*.log; do
-            grep -E "^(error|warning: unused)|-->|panicked|What went wrong|Caused by" "$f" | head -60 | while IFS= read -r line; do
+            sed -E 's/\x1b\[[0-9;]*[A-Za-z]//g' "$f" | grep -E "^error|^warning: unused|-->|panicked|What went wrong|Caused by" | head -60 | while IFS= read -r line; do
               echo "::error::${line//$'\r'/}"
             done
           done
@@ -116,7 +116,7 @@ jobs:
         run: |
           for f in ci-logs/*.log; do
             echo "== $f"
-            grep -E "^(error|e: |FAILURE|What went wrong)|error:|-->|panicked|Caused by|Could not|not found|Failed" "$f" | head -60 | while IFS= read -r line; do
+            sed -E 's/\x1b\[[0-9;]*[A-Za-z]//g' "$f" | grep -E "^error|^e: |^FAILURE|What went wrong|error:|-->|panicked|Caused by|Could not|not found|Failed" | head -60 | while IFS= read -r line; do
               echo "::error::${line//$'\r'/}"
             done
           done
