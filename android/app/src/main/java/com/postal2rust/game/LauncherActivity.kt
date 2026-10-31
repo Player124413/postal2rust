@@ -201,6 +201,11 @@ class LauncherActivity : ComponentActivity() {
             writeConfig()
         }
         column.addView(backendButton, spaced(top = 4))
+        column.addView(button("Диагностика: пустая сцена Bevy (без игры)") { playEmptyScene() }, spaced(top = 6))
+        column.addView(
+            text("Если пустая сцена тоже падает — проблема в устройстве или драйвере. Если работает — в игре.", 12f),
+            spaced(top = 4),
+        )
         column.addView(
             text("Если с OpenGL ES игра не падает, а с Vulkan падает — сообщите об этом: это драйвер GPU.", 12f),
             spaced(top = 4),
@@ -366,8 +371,16 @@ class LauncherActivity : ComponentActivity() {
 
     // ---- starting the game ------------------------------------------------------------------
 
+    /** Starts Bevy with an empty scene (no game code), for diagnosis. See `empty_scene` in p2android. */
+    private fun playEmptyScene() {
+        writeConfig()
+        File(dataDir(), "test_scene").writeText("1")
+        startActivity(Intent(this, android.app.NativeActivity::class.java))
+    }
+
     private fun play(editor: Boolean) {
         if (!isInstalled(gameDir())) return
+        File(dataDir(), "test_scene").delete()
         writeConfig()
         val flag = File(dataDir(), "start_touch_editor")
         if (editor) flag.writeText("1") else flag.delete()
