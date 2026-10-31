@@ -6,6 +6,8 @@ name: android-debug
 # * Push to arena/** or ci/**, or run by hand: artifacts only.
 # * The APK is signed with the fixed debug key in android/app/keystore, so each build updates the
 #   previous one in place (same applicationId, same signature, a higher versionCode).
+# * When a step fails, its error lines are repeated as annotations on the check run, so the
+#   failure reason can be read without opening the raw logs.
 
 on:
   push:
@@ -38,7 +40,20 @@ jobs:
         with:
           key: desktop-check
       - name: Check the desktop game (library + binary)
-        run: cargo check --locked -p p2game
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p ci-logs
+          cargo check --locked -p p2game 2>&1 | tee ci-logs/cargo-check.log
+      - name: Report errors as annotations
+        if: failure()
+        shell: bash
+        run: |
+          for f in ci-logs/*.log; do
+            grep -E "^(error|warning: unused)|-->|panicked|What went wrong|Caused by" "$f" | head -60 | while IFS= read -r line; do
+              echo "::error::${line//$'\r'/}"
+            done
+          done
 
   apk:
     runs-on: ubuntu-24.04
@@ -52,12 +67,17 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
-      - uses: android-actions/setup-android@v3
       - name: Android SDK packages
+        shell: bash
         run: |
-          yes | sdkmanager --licenses > /dev/null
-          sdkmanager --install "platforms;android-35" "build-tools;35.0.0"
+          set -o pipefail
+          mkdir -p ci-logs
+          SDKMANAGER="${ANDROID_HOME:-/usr/local/lib/android/sdk}/cmdline-tools/latest/bin/sdkmanager"
+          ls -la "$SDKMANAGER" 2>&1 | tee ci-logs/sdk.log || true
+          (yes | "$SDKMANAGER" --licenses > /dev/null) 2>&1 | tee -a ci-logs/sdk.log || true
+          "$SDKMANAGER" --install "platforms;android-35" "build-tools;35.0.0" 2>&1 | tee -a ci-logs/sdk.log
       - uses: nttld/setup-ndk@v1
+        id: ndk
         with:
           ndk-version: r27c
       - uses: dtolnay/rust-toolchain@stable
@@ -70,15 +90,33 @@ jobs:
         with:
           key: android-arm64-release
       - name: "Build libp2android.so (release profile, so the game code is optimized in the debug APK)"
-        run: cargo ndk -t arm64-v8a -P 26 -o android/app/src/main/jniLibs build -p p2android --profile release
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p ci-logs
+          cargo ndk -t arm64-v8a -P 26 -o android/app/src/main/jniLibs build -p p2android --profile release 2>&1 | tee ci-logs/cargo-ndk.log
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.10.2"
       - name: Build the debug APK
+        shell: bash
         working-directory: android
-        run: gradle --no-daemon :app:assembleDebug
+        run: |
+          set -o pipefail
+          mkdir -p ../ci-logs
+          gradle --no-daemon :app:assembleDebug 2>&1 | tee ../ci-logs/gradle.log
       - uses: actions/upload-artifact@v4
         with:
           name: Postal2Rust-android-arm64-debug
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+      - name: Report errors as annotations
+        if: failure()
+        shell: bash
+        run: |
+          for f in ci-logs/*.log; do
+            echo "== $f"
+            grep -E "^(error|e: |FAILURE|What went wrong)|error:|-->|panicked|Caused by|Could not|not found|Failed" "$f" | head -60 | while IFS= read -r line; do
+              echo "::error::${line//$'\r'/}"
+            done
+          done
