@@ -13,7 +13,7 @@ import java.util.Date
  */
 object GameLogs {
     /** Order matters: the newest crash goes last, where a copied tail of the text ends up. */
-    private val FILES = listOf("game-previous", "logcat-previous", "crash-previous", "game", "logcat", "crash")
+    private val FILES = listOf("exit", "game-previous", "logcat-previous", "crash-previous", "game", "logcat", "crash")
 
     private const val LIMIT_BYTES = 2L shl 20
 

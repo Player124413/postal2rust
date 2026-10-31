@@ -60,6 +60,19 @@ class LauncherActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         buildUi()
         refresh()
+        recordExits()
+    }
+
+    /** Reads how the earlier runs of the game ended (native crashes included) into the logs. */
+    private fun recordExits() {
+        Thread {
+            val added = try {
+                ExitReasons.record(this, logsDir())
+            } catch (e: Exception) {
+                0
+            }
+            if (added > 0) ui.post { toast("Найдено записей о завершении игры: $added. Они попадут в лог.") }
+        }.start()
     }
 
     override fun onResume() {
