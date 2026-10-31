@@ -577,7 +577,10 @@ fn load_scene(
     }
     sim.reload = false;
     snap.before = Some(existing.iter().collect());
-    let gpu_bc = bc.as_ref().is_some_and(|s| s.0.contains(CompressedImageFormats::BC));
+    // Android: BC (DXT) textures are always decoded to RGBA8 here. The Adreno driver crashed (SIGSEGV)
+    // in the first frames of the level, and BC is not a format Adreno GPUs support.
+    let gpu_bc = !cfg!(target_os = "android") && bc.as_ref().is_some_and(|s| s.0.contains(CompressedImageFormats::BC));
+    println!("textures: BC on GPU = {gpu_bc}");
     let lib = sim.game.host.lib.clone();
     // After a save load the level package is the save (its actors), but the geometry, terrain and
     // lightmaps are the original map's: the host's map package (the save loader picks it from the
