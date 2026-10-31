@@ -10,7 +10,7 @@
 //! p2game [--map X]                                  windowed: render the level with VM-driven actor transforms
 //! ```
 //! Common options: `--game DIR` (install root), `--game-class Pkg.Class`, `--options \"?k=v\"`.
-//! The whole host lives in the library (`crate::app`); this binary only picks the allocator.
+//! The whole host lives in the library (`p2game::app`); this binary only picks the allocator.
 
 /// The script VM allocates heavily (values, frames, strings); mimalloc keeps that fast where the
 /// Windows system heap degrades over a session.
@@ -18,5 +18,5 @@
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 fn main() {
-    crate::app::main_entry();
+    p2game::app::main_entry();
 }
