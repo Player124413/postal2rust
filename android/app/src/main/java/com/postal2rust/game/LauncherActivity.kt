@@ -48,7 +48,6 @@ class LauncherActivity : ComponentActivity() {
     private lateinit var deleteButton: Button
     private lateinit var editorButton: Button
     private lateinit var fpsSpinner: Spinner
-    private lateinit var backendButton: Button
     private lateinit var soundButton: Button
 
     @Volatile private var copying = false
@@ -194,14 +193,7 @@ class LauncherActivity : ComponentActivity() {
             spaced(top = 4),
         )
 
-        column.addView(text("Графика (для проверки падения)", 15f, bold = true), spaced(top = 22))
-        backendButton = button(backendLabel()) {
-            val next = if (prefs().getString(KEY_BACKEND, "vulkan") == "gl") "vulkan" else "gl"
-            prefs().edit().putString(KEY_BACKEND, next).apply()
-            backendButton.text = backendLabel()
-            writeConfig()
-        }
-        column.addView(backendButton, spaced(top = 4))
+        column.addView(text("Звук и диагностика", 15f, bold = true), spaced(top = 22))
         soundButton = button(soundLabel()) {
             val next = !prefs().getBoolean(KEY_SOUND, true)
             prefs().edit().putBoolean(KEY_SOUND, next).apply()
@@ -212,10 +204,6 @@ class LauncherActivity : ComponentActivity() {
         column.addView(button("Диагностика: пустая сцена Bevy (без игры)") { playEmptyScene() }, spaced(top = 6))
         column.addView(
             text("Если пустая сцена тоже падает — проблема в устройстве или драйвере. Если работает — в игре.", 12f),
-            spaced(top = 4),
-        )
-        column.addView(
-            text("Если с OpenGL ES игра не падает, а с Vulkan падает — сообщите об этом: это драйвер GPU.", 12f),
             spaced(top = 4),
         )
 
@@ -399,16 +387,11 @@ class LauncherActivity : ComponentActivity() {
         if (prefs().getBoolean(KEY_SOUND, true)) "Звук: включён (нажмите, чтобы выключить для проверки)"
         else "Звук: выключен (для проверки падения)"
 
-    private fun backendLabel(): String =
-        if (prefs().getString(KEY_BACKEND, "vulkan") == "gl") "Графика: OpenGL ES (нажмите, чтобы вернуть Vulkan)"
-        else "Графика: Vulkan (по умолчанию, нажмите для OpenGL ES)"
-
-    /** Settings the native side reads at start: `fps=N` and `backend=vulkan|gl`. */
+    /** Settings the native side reads at start: `fps=N` and `audio=on|off`. Rendering is always Vulkan. */
     private fun writeConfig() {
         val fps = prefs().getInt(KEY_FPS, 60)
-        val backend = prefs().getString(KEY_BACKEND, "vulkan")
         val audio = if (prefs().getBoolean(KEY_SOUND, true)) "on" else "off"
-        File(dataDir(), "android.cfg").writeText("# written by the launcher\nfps=$fps\nbackend=$backend\naudio=$audio\n")
+        File(dataDir(), "android.cfg").writeText("# written by the launcher\nfps=$fps\naudio=$audio\n")
     }
 
     // ---- helpers ----------------------------------------------------------------------------
@@ -438,7 +421,6 @@ class LauncherActivity : ComponentActivity() {
 
     companion object {
         private const val KEY_FPS = "fps"
-        private const val KEY_BACKEND = "backend"
         private const val KEY_SOUND = "sound"
         private val FPS_VALUES = listOf(30, 60, 90, 120)
         /** How much of the log goes to the clipboard (the full log is in the shared file). */
