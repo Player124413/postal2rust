@@ -7,8 +7,9 @@
 //!   before `InputSystems`, so the player's bindings from the game's ini apply to them too.
 //! * A touch that starts on empty screen and moves turns the view (`MouseMotion`). A short tap
 //!   clicks where the finger was (menus, the map, the inventory) and moves the cursor there.
-//! * The MOUSE button (top right, left of the gear) turns on mouse mode: a visible cursor that one
-//!   finger drags, and a tap clicks where the cursor is. Menus and the inventory are used this way.
+//! * The MOUSE button (top right, left of the gear) turns on mouse mode: the cursor sits under the
+//!   finger (touch = mouse), a tap clicks where the finger is, and a held finger holds the button.
+//!   Menus and the inventory are used this way.
 //! * The gear button (top right) opens the editor: tap a control to select it, drag it to move,
 //!   drag its corner handle to resize, and change its action, opacity, or add or delete controls.
 //!   The layout is saved to `touch_layout.txt` in the user folder (survives app updates).
@@ -141,11 +142,6 @@ fn default_layout() -> Vec<Control> {
         button("use", 0.60, 0.50, 0.13),
         button("holster", 0.78, 0.30, 0.11),
         button("menu", 0.06, 0.12, 0.10),
-        button("up", 0.40, 0.62, 0.11),
-        button("left", 0.34, 0.72, 0.11),
-        button("right", 0.46, 0.72, 0.11),
-        button("down", 0.40, 0.82, 0.11),
-        button("enter", 0.52, 0.86, 0.11),
         button("inventory", 0.18, 0.12, 0.10),
         button("map", 0.30, 0.12, 0.10),
         button("health", 0.42, 0.12, 0.10),
@@ -380,8 +376,8 @@ enum Role {
     Button { idx: usize, out: Out },
     /// Finger on empty screen: a look drag once it moves, a click if it does not.
     Pointer { start: Vec2, last: Vec2, moved: bool, t0: Instant },
-    /// Mouse mode: the finger drags the cursor; a tap clicks where the cursor is.
-    Trackpad { last: Vec2, moved: bool, t0: Instant },
+    /// Mouse mode: the cursor is under the finger; the left button is held while it is down.
+    Trackpad,
     /// Editor: dragging a control (`grab` = finger minus centre).
     Move { idx: usize, grab: Vec2 },
     /// Editor: dragging the corner handle.
@@ -621,7 +617,12 @@ fn route(
                         Role::Button { idx, out }
                     }
                 } else if held.mouse {
-                    Role::Trackpad { last: p, moved: false, t0: Instant::now() }
+                    // Touch = mouse: the cursor goes under the finger and the button is held until release.
+                    held.cursor = p.clamp(Vec2::ZERO, Vec2::new(w, h));
+                    win.set_cursor_position(Some(held.cursor));
+                    sink.send(Emit::Mouse(MouseButton::Left, true));
+                    println!("touch: mouse press at {:?}", held.cursor);
+                    Role::Trackpad
                 } else {
                     Role::Pointer { start: p, last: p, moved: false, t0: Instant::now() }
                 };
@@ -666,17 +667,9 @@ fn route(
                         }
                         *last = p;
                     }
-                    Role::Trackpad { last, moved, .. } => {
-                        if !*moved && (p - *last).length() > 8.0 {
-                            *moved = true;
-                        }
-                        // Faster finger, faster cursor: slow moves are precise, long swipes cross the screen.
-                        let d = p - *last;
-                        let gain = 1.6 + (d.length() * 0.12).min(3.0);
-                        let next = (held.cursor + d * gain).clamp(Vec2::ZERO, Vec2::new(w, h));
-                        held.cursor = next;
-                        win.set_cursor_position(Some(next));
-                        *last = p;
+                    Role::Trackpad => {
+                        held.cursor = p.clamp(Vec2::ZERO, Vec2::new(w, h));
+                        win.set_cursor_position(Some(held.cursor));
                     }
                     Role::Move { idx, grab } => {
                         if let Some(c) = layout.items.get_mut(*idx) {
@@ -723,17 +716,12 @@ fn route(
                             held.pending.push((release_at, Emit::Mouse(MouseButton::Left, false)));
                         }
                     }
-                    Role::Trackpad { moved, t0, .. } => {
-                        println!("touch: tap at {p:?}, moved {moved}, cursor {:?}", held.cursor);
-                        if !moved && t0.elapsed().as_millis() < 450 {
-                            // A tap jumps the cursor to the finger and clicks there (menus read the
-                            // window's cursor), so any button on the screen can be reached in one tap.
-                            held.cursor = p.clamp(Vec2::ZERO, Vec2::new(w, h));
-                            win.set_cursor_position(Some(held.cursor));
-                            sink.send(Emit::Mouse(MouseButton::Left, true));
-                            let release_at = held.frame + 2;
-                            held.pending.push((release_at, Emit::Mouse(MouseButton::Left, false)));
-                        }
+                    Role::Trackpad => {
+                        held.cursor = p.clamp(Vec2::ZERO, Vec2::new(w, h));
+                        win.set_cursor_position(Some(held.cursor));
+                        // Release two frames later so the UI sees the press even on a quick tap.
+                        let release_at = held.frame + 2;
+                        held.pending.push((release_at, Emit::Mouse(MouseButton::Left, false)));
                     }
                     Role::Move { .. } | Role::Resize { .. } => save_layout(&layout),
                     Role::Ignore => {}
