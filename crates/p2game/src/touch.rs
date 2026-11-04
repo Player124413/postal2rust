@@ -255,6 +255,11 @@ fn mouse_area(w: f32) -> Area {
     Area::new(w - 150.0, 12.0, w - 72.0, 64.0)
 }
 
+/// The FPS button, left of the mouse button.
+fn fps_area(w: f32) -> Area {
+    Area::new(w - 226.0, 12.0, w - 158.0, 64.0)
+}
+
 /// The mouse-mode cursor: a ring drawn over everything, moved by `paint`.
 #[derive(Component)]
 struct TouchCursor;
@@ -534,6 +539,7 @@ fn route(
     mut buttons: ResMut<Messages<MouseButtonInput>>,
     mut motion: ResMut<Messages<MouseMotion>>,
     mut wheel: ResMut<Messages<MouseWheel>>,
+    mut overlay: Option<ResMut<crate::debug::DebugOverlay>>,
 ) {
     let Ok((win_e, mut win)) = windows.single_mut() else { return };
     let (w, h) = (win.width(), win.height());
@@ -567,6 +573,12 @@ fn route(
                     if held.mouse {
                         held.cursor = Vec2::new(w, h) * 0.5;
                         win.set_cursor_position(Some(held.cursor));
+                    }
+                    editor.dirty = true;
+                    Role::Ignore
+                } else if !editor.editing && fps_area(w).contains(p) {
+                    if let Some(o) = overlay.as_deref_mut() {
+                        o.visible = !o.visible;
                     }
                     editor.dirty = true;
                     Role::Ignore
@@ -745,6 +757,7 @@ fn rebuild(
     windows: Query<&Window, With<PrimaryWindow>>,
     layout: Res<TouchLayout>,
     held: Res<Held>,
+    overlay: Option<Res<crate::debug::DebugOverlay>>,
     mut editor: ResMut<TouchEditor>,
 ) {
     let Ok(win) = windows.single() else { return };
@@ -787,6 +800,33 @@ fn rebuild(
         .with_children(|p| {
             p.spawn((Text::new("UI"), font(15.0), TextColor(TEXT)));
         });
+    // FPS button: shows or hides the frame-rate overlay (the same one F3 toggles).
+    if !editor.editing {
+        let f = fps_area(w);
+        let on = overlay.as_ref().is_some_and(|o| o.visible);
+        commands
+            .spawn((
+                TouchUi,
+                Node {
+                    position_type: PositionType::Absolute,
+                    left: px(f.min.x),
+                    top: px(f.min.y),
+                    width: px(f.max.x - f.min.x),
+                    height: px(f.max.y - f.min.y),
+                    border: UiRect::all(px(1.0)),
+                    border_radius: BorderRadius::MAX,
+                    justify_content: JustifyContent::Center,
+                    align_items: AlignItems::Center,
+                    ..default()
+                },
+                BackgroundColor(if on { ACCENT } else { Color::srgba(0.1, 0.11, 0.13, 0.6) }),
+                BorderColor::all(Color::srgba(1.0, 1.0, 1.0, 0.2)),
+                GlobalZIndex(Z),
+            ))
+            .with_children(|p| {
+                p.spawn((Text::new("FPS"), font(13.0), TextColor(TEXT)));
+            });
+    }
     // Mouse-mode button.
     if !editor.editing {
         let m = mouse_area(w);

@@ -27,8 +27,10 @@ android {
         applicationId = "com.postal2rust.game"
         minSdk = 26
         targetSdk = 35
-        versionCode = gitCommitCount
-        versionName = "0.3.0-debug.$gitCommitCount"
+        // The base keeps the number above every build already installed on phones (the branch
+        // history was rewritten during debugging, so the raw commit count fell back to 26).
+        versionCode = 1000 + gitCommitCount
+        versionName = "0.3.0-debug.${1000 + gitCommitCount}"
         // 64-bit phones only: every Android phone sold for years has arm64-v8a.
         ndk {
             abiFilters += listOf("arm64-v8a")
