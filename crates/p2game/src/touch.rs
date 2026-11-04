@@ -7,8 +7,8 @@
 //!   before `InputSystems`, so the player's bindings from the game's ini apply to them too.
 //! * A touch that starts on empty screen and moves turns the view (`MouseMotion`). A short tap
 //!   clicks where the finger was (menus, the map, the inventory) and moves the cursor there.
-//! * The MOUSE button (top right, left of the gear) turns on mouse mode: the cursor sits under the
-//!   finger (touch = mouse), a tap clicks where the finger is, and a held finger holds the button.
+//! * The MOUSE button (top right, left of the gear) turns on mouse mode: every touch moves the cursor
+//!   to the finger anywhere on screen (controls are ignored), and a short tap clicks there.
 //!   Menus and the inventory are used this way.
 //! * The gear button (top right) opens the editor: tap a control to select it, drag it to move,
 //!   drag its corner handle to resize, and change its action, opacity, or add or delete controls.
@@ -376,8 +376,8 @@ enum Role {
     Button { idx: usize, out: Out },
     /// Finger on empty screen: a look drag once it moves, a click if it does not.
     Pointer { start: Vec2, last: Vec2, moved: bool, t0: Instant },
-    /// Mouse mode: the cursor is under the finger; the left button is held while it is down.
-    Trackpad,
+    /// Mouse mode: the cursor follows the finger anywhere on screen; a short tap also clicks.
+    Trackpad { start: Vec2, t0: Instant, moved: bool },
     /// Editor: dragging a control (`grab` = finger minus centre).
     Move { idx: usize, grab: Vec2 },
     /// Editor: dragging the corner handle.
@@ -588,6 +588,11 @@ fn route(
                     }
                     editor.dirty = true;
                     Role::Ignore
+                } else if held.mouse && !editor.editing {
+                    // Mouse mode: any touch steers the cursor, even over the stick and buttons.
+                    held.cursor = p.clamp(Vec2::ZERO, Vec2::new(w, h));
+                    win.set_cursor_position(Some(held.cursor));
+                    Role::Trackpad { start: p, t0: Instant::now(), moved: false }
                 } else if editor.editing {
                     match hit_control(&layout.items, w, h, p) {
                         Some(idx) => {
@@ -616,13 +621,6 @@ fn route(
                         }
                         Role::Button { idx, out }
                     }
-                } else if held.mouse {
-                    // Touch = mouse: the cursor goes under the finger and the button is held until release.
-                    held.cursor = p.clamp(Vec2::ZERO, Vec2::new(w, h));
-                    win.set_cursor_position(Some(held.cursor));
-                    sink.send(Emit::Mouse(MouseButton::Left, true));
-                    println!("touch: mouse press at {:?}", held.cursor);
-                    Role::Trackpad
                 } else {
                     Role::Pointer { start: p, last: p, moved: false, t0: Instant::now() }
                 };
@@ -667,7 +665,10 @@ fn route(
                         }
                         *last = p;
                     }
-                    Role::Trackpad => {
+                    Role::Trackpad { start, moved, .. } => {
+                        if !*moved && (p - *start).length() > 12.0 {
+                            *moved = true;
+                        }
                         held.cursor = p.clamp(Vec2::ZERO, Vec2::new(w, h));
                         win.set_cursor_position(Some(held.cursor));
                     }
@@ -716,12 +717,15 @@ fn route(
                             held.pending.push((release_at, Emit::Mouse(MouseButton::Left, false)));
                         }
                     }
-                    Role::Trackpad => {
+                    Role::Trackpad { moved, t0, .. } => {
                         held.cursor = p.clamp(Vec2::ZERO, Vec2::new(w, h));
                         win.set_cursor_position(Some(held.cursor));
-                        // Release two frames later so the UI sees the press even on a quick tap.
-                        let release_at = held.frame + 2;
-                        held.pending.push((release_at, Emit::Mouse(MouseButton::Left, false)));
+                        // A short tap without movement clicks where the finger lifted.
+                        if !moved && t0.elapsed().as_millis() < 450 {
+                            sink.send(Emit::Mouse(MouseButton::Left, true));
+                            let release_at = held.frame + 2;
+                            held.pending.push((release_at, Emit::Mouse(MouseButton::Left, false)));
+                        }
                     }
                     Role::Move { .. } | Role::Resize { .. } => save_layout(&layout),
                     Role::Ignore => {}
