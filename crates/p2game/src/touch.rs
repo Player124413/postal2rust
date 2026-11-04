@@ -86,6 +86,11 @@ const ACTIONS: &[ActionDef] = &[
     ActionDef { id: "health", label: "Health", out: Out::Key(KeyCode::KeyT) },
     ActionDef { id: "menu", label: "Menu", out: Out::Key(KeyCode::Escape) },
     ActionDef { id: "enter", label: "Enter", out: Out::Key(KeyCode::Enter) },
+    // Menus are also driven by the arrow keys: a reliable way to pick New Game, Load, Options.
+    ActionDef { id: "up", label: "Up", out: Out::Key(KeyCode::ArrowUp) },
+    ActionDef { id: "down", label: "Down", out: Out::Key(KeyCode::ArrowDown) },
+    ActionDef { id: "left", label: "Left", out: Out::Key(KeyCode::ArrowLeft) },
+    ActionDef { id: "right", label: "Right", out: Out::Key(KeyCode::ArrowRight) },
     ActionDef { id: "wheelup", label: "Wheel +", out: Out::Wheel(1.0) },
     ActionDef { id: "wheeldown", label: "Wheel -", out: Out::Wheel(-1.0) },
     ActionDef { id: "previtem", label: "Prev item", out: Out::Key(KeyCode::BracketLeft) },
@@ -136,6 +141,11 @@ fn default_layout() -> Vec<Control> {
         button("use", 0.60, 0.50, 0.13),
         button("holster", 0.78, 0.30, 0.11),
         button("menu", 0.06, 0.12, 0.10),
+        button("up", 0.40, 0.62, 0.11),
+        button("left", 0.34, 0.72, 0.11),
+        button("right", 0.46, 0.72, 0.11),
+        button("down", 0.40, 0.82, 0.11),
+        button("enter", 0.52, 0.86, 0.11),
         button("inventory", 0.18, 0.12, 0.10),
         button("map", 0.30, 0.12, 0.10),
         button("health", 0.42, 0.12, 0.10),
@@ -714,6 +724,7 @@ fn route(
                         }
                     }
                     Role::Trackpad { moved, t0, .. } => {
+                        println!("touch: tap at {p:?}, moved {moved}, cursor {:?}", held.cursor);
                         if !moved && t0.elapsed().as_millis() < 450 {
                             // A tap jumps the cursor to the finger and clicks there (menus read the
                             // window's cursor), so any button on the screen can be reached in one tap.
