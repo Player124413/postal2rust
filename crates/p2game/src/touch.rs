@@ -9,7 +9,7 @@
 //!   clicks where the finger was (menus, the map, the inventory) and moves the cursor there.
 //! * The MOUSE button (top right, left of the gear) turns on mouse mode: a finger drag moves the cursor
 //!   by the finger's distance times the speed (the x-value buttons under it), controls are ignored,
-//!   and a short tap clicks at the cursor.
+//!   a short tap clicks at the cursor, and a finger held still for a moment holds the button (drag).
 //!   Menus and the inventory are used this way.
 //! * The gear button (top right) opens the editor: tap a control to select it, drag it to move,
 //!   drag its corner handle to resize, and change its action, opacity, or add or delete controls.
@@ -391,7 +391,7 @@ enum Role {
     /// Finger on empty screen: a look drag once it moves, a click if it does not.
     Pointer { start: Vec2, last: Vec2, moved: bool, t0: Instant },
     /// Mouse mode: the cursor follows the finger anywhere on screen; a short tap also clicks.
-    Trackpad { start: Vec2, last: Vec2, t0: Instant, moved: bool },
+    Trackpad { start: Vec2, last: Vec2, t0: Instant, moved: bool, pressed: bool },
     /// Editor: dragging a control (`grab` = finger minus centre).
     Move { idx: usize, grab: Vec2 },
     /// Editor: dragging the corner handle.
@@ -570,6 +570,15 @@ fn route(
     for e in due_pending(&mut held) {
         sink.send(e);
     }
+    // Mouse mode: a finger that stays still for a moment holds the left button, so the next moves drag.
+    for role in fingers.roles.values_mut() {
+        if let Role::Trackpad { moved, t0, pressed, .. } = role {
+            if !*moved && !*pressed && t0.elapsed().as_millis() >= LONG_PRESS_MS {
+                *pressed = true;
+                sink.send(Emit::Mouse(MouseButton::Left, true));
+            }
+        }
+    }
     let touches: Vec<TouchInput> = touches.read().copied().collect();
     for t in touches {
         let p = t.position;
@@ -614,7 +623,7 @@ fn route(
                     Role::Ignore
                 } else if held.mouse && !editor.editing {
                     // Mouse mode: any touch steers the cursor (relative, so every part of the menu is reachable).
-                    Role::Trackpad { start: p, last: p, t0: Instant::now(), moved: false }
+                    Role::Trackpad { start: p, last: p, t0: Instant::now(), moved: false, pressed: false }
                 } else if editor.editing {
                     match hit_control(&layout.items, w, h, p) {
                         Some(idx) => {
@@ -741,11 +750,14 @@ fn route(
                             held.pending.push((release_at, Emit::Mouse(MouseButton::Left, false)));
                         }
                     }
-                    Role::Trackpad { moved, t0, .. } => {
-                        // A short tap without movement clicks at the cursor.
-                        if !moved && t0.elapsed().as_millis() < 450 {
+                    Role::Trackpad { moved, t0, pressed, .. } => {
+                        let release_at = held.frame + 2;
+                        if pressed {
+                            // End of a long press (drag): release where the cursor is.
+                            held.pending.push((release_at, Emit::Mouse(MouseButton::Left, false)));
+                        } else if !moved && t0.elapsed().as_millis() < TAP_MS {
+                            // A short tap without movement clicks at the cursor.
                             sink.send(Emit::Mouse(MouseButton::Left, true));
-                            let release_at = held.frame + 2;
                             held.pending.push((release_at, Emit::Mouse(MouseButton::Left, false)));
                         }
                     }
@@ -761,6 +773,9 @@ fn route(
 // UI: the gear button, the controls, the editor panel. Rebuilt when something changes.
 
 const Z: i32 = i32::MAX - 10;
+/// Mouse mode timings (the same idea as Pojav's: a quick tap clicks, a still press drags).
+const TAP_MS: u128 = 300;
+const LONG_PRESS_MS: u128 = 300;
 const ACCENT: Color = Color::srgb(0.93, 0.26, 0.21);
 const TEXT: Color = Color::srgb(0.92, 0.93, 0.95);
 const PANEL: Color = Color::srgba(0.055, 0.06, 0.07, 0.92);
