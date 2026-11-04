@@ -997,7 +997,8 @@ fn paint(
         node.margin = UiRect { left: px(off.x), top: px(off.y), ..default() };
     }
     if let Ok((mut node, mut vis)) = cursor.single_mut() {
-        *vis = if held.mouse { Visibility::Visible } else { Visibility::Hidden };
+        // Hidden: the game draws its own arrow cursor at the same place (see natives.rs `draw_cursor`).
+        *vis = Visibility::Hidden;
         node.left = px(held.cursor.x - 10.0);
         node.top = px(held.cursor.y - 10.0);
     }

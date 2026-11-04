@@ -694,6 +694,14 @@ impl MenuHost {
     pub fn set_mouse(&self, vm: &mut Vm, x: f32, y: f32) {
         vm.set_prop(self.player, "WindowsMouseX", Value::Float(x));
         vm.set_prop(self.player, "WindowsMouseY", Value::Float(y));
+        // The menu's own mouse position (root `MouseX/Y`, in UI units): the cursor drawn by
+        // `draw_cursor` and the button hit tests use it. Without this the cursor stayed where UWindow
+        // last saw it (top left) and clicks never reached the menu buttons.
+        if let Some(root) = self.base_menu {
+            let scale = vm.get_prop(root, "GUIScale").map(|v| v.as_float()).filter(|s| *s > 0.0).unwrap_or(1.0);
+            vm.set_prop(root, "MouseX", Value::Float(x / scale));
+            vm.set_prop(root, "MouseY", Value::Float(y / scale));
+        }
     }
 
     /// Takes a pending script cursor warp (`SETMOUSE`), applying it to the viewport. The host
