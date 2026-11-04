@@ -546,11 +546,7 @@ pub fn android_main(data_dir: PathBuf) {
             }
             if line.trim() == "backend=gl" {
                 // SAFETY: as above.
-                unsafe {
-                    std::env::set_var("WGPU_BACKEND", "gl");
-                    // Diagnostics: the EGL/wgpu reason why no OpenGL ES adapter is found.
-                    std::env::set_var("RUST_LOG", "wgpu_hal=debug,wgpu_core=debug,bevy_render=debug");
-                }
+                unsafe { std::env::set_var("WGPU_BACKEND", "gl") };
             }
         }
     }
