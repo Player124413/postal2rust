@@ -7,8 +7,9 @@
 //!   before `InputSystems`, so the player's bindings from the game's ini apply to them too.
 //! * A touch that starts on empty screen and moves turns the view (`MouseMotion`). A short tap
 //!   clicks where the finger was (menus, the map, the inventory) and moves the cursor there.
-//! * The MOUSE button (top right, left of the gear) turns on mouse mode: every touch moves the cursor
-//!   to the finger anywhere on screen (controls are ignored), and a short tap clicks there.
+//! * The MOUSE button (top right, left of the gear) turns on mouse mode: a finger drag moves the cursor
+//!   by the finger's distance times the speed (the x-value buttons under it), controls are ignored,
+//!   and a short tap clicks at the cursor.
 //!   Menus and the inventory are used this way.
 //! * The gear button (top right) opens the editor: tap a control to select it, drag it to move,
 //!   drag its corner handle to resize, and change its action, opacity, or add or delete controls.
@@ -45,8 +46,8 @@ impl Plugin for TouchPlugin {
         let editing = std::env::var_os("P2GAME_TOUCH_EDIT").is_some();
         app.insert_resource(TouchLayout { items: load_layout().unwrap_or_else(default_layout) })
             .insert_resource(TouchEditor { editing, panel: editing, selected: None, dirty: true, last_size: (0.0, 0.0) })
+            .insert_resource(Held { sens: 2.0, ..default() })
             .init_resource::<Fingers>()
-            .init_resource::<Held>()
             .add_systems(Startup, spawn_cursor)
             .add_systems(PreUpdate, route.before(InputSystems))
             .add_systems(Update, (rebuild, paint).chain());
@@ -261,6 +262,19 @@ fn mouse_area(w: f32) -> Area {
     Area::new(w - 150.0, 12.0, w - 72.0, 64.0)
 }
 
+/// Mouse-mode speed row under the top buttons: minus, value, plus.
+fn sens_minus_area(w: f32) -> Area {
+    Area::new(w - 226.0, 72.0, w - 186.0, 112.0)
+}
+
+fn sens_value_area(w: f32) -> Area {
+    Area::new(w - 182.0, 72.0, w - 126.0, 112.0)
+}
+
+fn sens_plus_area(w: f32) -> Area {
+    Area::new(w - 122.0, 72.0, w - 82.0, 112.0)
+}
+
 /// The FPS button, left of the mouse button.
 fn fps_area(w: f32) -> Area {
     Area::new(w - 226.0, 12.0, w - 158.0, 64.0)
@@ -377,7 +391,7 @@ enum Role {
     /// Finger on empty screen: a look drag once it moves, a click if it does not.
     Pointer { start: Vec2, last: Vec2, moved: bool, t0: Instant },
     /// Mouse mode: the cursor follows the finger anywhere on screen; a short tap also clicks.
-    Trackpad { start: Vec2, t0: Instant, moved: bool },
+    Trackpad { start: Vec2, last: Vec2, t0: Instant, moved: bool },
     /// Editor: dragging a control (`grab` = finger minus centre).
     Move { idx: usize, grab: Vec2 },
     /// Editor: dragging the corner handle.
@@ -397,6 +411,8 @@ struct Held {
     mouse: bool,
     /// Mouse-mode cursor position, in logical pixels.
     cursor: Vec2,
+    /// Mouse-mode speed: cursor pixels per finger pixel.
+    sens: f32,
     /// Stick knob per control: (shown offset, target offset), in logical pixels.
     knobs: HashMap<usize, (Vec2, Vec2)>,
     /// WASD keys the stick currently holds.
@@ -588,11 +604,17 @@ fn route(
                     }
                     editor.dirty = true;
                     Role::Ignore
+                } else if held.mouse && !editor.editing && sens_minus_area(w).contains(p) {
+                    held.sens = (held.sens - 0.5).max(0.5);
+                    editor.dirty = true;
+                    Role::Ignore
+                } else if held.mouse && !editor.editing && sens_plus_area(w).contains(p) {
+                    held.sens = (held.sens + 0.5).min(6.0);
+                    editor.dirty = true;
+                    Role::Ignore
                 } else if held.mouse && !editor.editing {
-                    // Mouse mode: any touch steers the cursor, even over the stick and buttons.
-                    held.cursor = p.clamp(Vec2::ZERO, Vec2::new(w, h));
-                    win.set_cursor_position(Some(held.cursor));
-                    Role::Trackpad { start: p, t0: Instant::now(), moved: false }
+                    // Mouse mode: any touch steers the cursor (relative, so every part of the menu is reachable).
+                    Role::Trackpad { start: p, last: p, t0: Instant::now(), moved: false }
                 } else if editor.editing {
                     match hit_control(&layout.items, w, h, p) {
                         Some(idx) => {
@@ -665,12 +687,14 @@ fn route(
                         }
                         *last = p;
                     }
-                    Role::Trackpad { start, moved, .. } => {
+                    Role::Trackpad { start, last, moved, .. } => {
                         if !*moved && (p - *start).length() > 12.0 {
                             *moved = true;
                         }
-                        held.cursor = p.clamp(Vec2::ZERO, Vec2::new(w, h));
+                        let d = p - *last;
+                        held.cursor = (held.cursor + d * held.sens).clamp(Vec2::ZERO, Vec2::new(w, h));
                         win.set_cursor_position(Some(held.cursor));
+                        *last = p;
                     }
                     Role::Move { idx, grab } => {
                         if let Some(c) = layout.items.get_mut(*idx) {
@@ -718,9 +742,7 @@ fn route(
                         }
                     }
                     Role::Trackpad { moved, t0, .. } => {
-                        held.cursor = p.clamp(Vec2::ZERO, Vec2::new(w, h));
-                        win.set_cursor_position(Some(held.cursor));
-                        // A short tap without movement clicks where the finger lifted.
+                        // A short tap without movement clicks at the cursor.
                         if !moved && t0.elapsed().as_millis() < 450 {
                             sink.send(Emit::Mouse(MouseButton::Left, true));
                             let release_at = held.frame + 2;
@@ -860,6 +882,38 @@ fn rebuild(
             .with_children(|p| {
                 p.spawn((Text::new("MOUSE"), font(13.0), TextColor(TEXT)));
             });
+    }
+    // Mouse-mode speed row: [-] x2.0 [+].
+    if held.mouse && !editor.editing {
+        let cells = [
+            (sens_minus_area(w), "-".to_string(), true),
+            (sens_value_area(w), format!("x{:.1}", held.sens), false),
+            (sens_plus_area(w), "+".to_string(), true),
+        ];
+        for (a, label, button) in cells {
+            commands
+                .spawn((
+                    TouchUi,
+                    Node {
+                        position_type: PositionType::Absolute,
+                        left: px(a.min.x),
+                        top: px(a.min.y),
+                        width: px(a.max.x - a.min.x),
+                        height: px(a.max.y - a.min.y),
+                        border: UiRect::all(px(1.0)),
+                        border_radius: BorderRadius::MAX,
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        ..default()
+                    },
+                    BackgroundColor(if button { Color::srgba(0.1, 0.11, 0.13, 0.6) } else { Color::NONE }),
+                    BorderColor::all(Color::srgba(1.0, 1.0, 1.0, if button { 0.2 } else { 0.0 })),
+                    GlobalZIndex(Z),
+                ))
+                .with_children(|p| {
+                    p.spawn((Text::new(label), font(15.0), TextColor(TEXT)));
+                });
+        }
     }
     // Controls.
     for (i, c) in layout.items.iter().enumerate() {
