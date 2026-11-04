@@ -7,6 +7,8 @@
 //!   before `InputSystems`, so the player's bindings from the game's ini apply to them too.
 //! * A touch that starts on empty screen and moves turns the view (`MouseMotion`). A short tap
 //!   clicks where the finger was (menus, the map, the inventory) and moves the cursor there.
+//! * The MOUSE button (top right, left of the gear) turns on mouse mode: a visible cursor that one
+//!   finger drags, and a tap clicks where the cursor is. Menus and the inventory are used this way.
 //! * The gear button (top right) opens the editor: tap a control to select it, drag it to move,
 //!   drag its corner handle to resize, and change its action, opacity, or add or delete controls.
 //!   The layout is saved to `touch_layout.txt` in the user folder (survives app updates).
@@ -44,6 +46,7 @@ impl Plugin for TouchPlugin {
             .insert_resource(TouchEditor { editing, panel: editing, selected: None, dirty: true, last_size: (0.0, 0.0) })
             .init_resource::<Fingers>()
             .init_resource::<Held>()
+            .add_systems(Startup, spawn_cursor)
             .add_systems(PreUpdate, route.before(InputSystems))
             .add_systems(Update, (rebuild, paint).chain());
     }
@@ -247,6 +250,35 @@ fn gear_area(w: f32) -> Area {
     Area::new(w - 64.0, 12.0, w - 12.0, 64.0)
 }
 
+/// The mouse-mode button, just left of the gear button.
+fn mouse_area(w: f32) -> Area {
+    Area::new(w - 150.0, 12.0, w - 72.0, 64.0)
+}
+
+/// The mouse-mode cursor: a ring drawn over everything, moved by `paint`.
+#[derive(Component)]
+struct TouchCursor;
+
+fn spawn_cursor(mut commands: Commands) {
+    commands.spawn((
+        TouchCursor,
+        Node {
+            position_type: PositionType::Absolute,
+            left: px(0.0),
+            top: px(0.0),
+            width: px(20.0),
+            height: px(20.0),
+            border: UiRect::all(px(2.0)),
+            border_radius: BorderRadius::MAX,
+            ..default()
+        },
+        BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.25)),
+        BorderColor::all(ACCENT),
+        GlobalZIndex(Z + 2),
+        Visibility::Hidden,
+    ));
+}
+
 fn panel_width(w: f32) -> f32 {
     (w * 0.32).clamp(220.0, 300.0)
 }
@@ -333,6 +365,8 @@ enum Role {
     Button { idx: usize, out: Out },
     /// Finger on empty screen: a look drag once it moves, a click if it does not.
     Pointer { start: Vec2, last: Vec2, moved: bool, t0: Instant },
+    /// Mouse mode: the finger drags the cursor; a tap clicks where the cursor is.
+    Trackpad { last: Vec2, moved: bool, t0: Instant },
     /// Editor: dragging a control (`grab` = finger minus centre).
     Move { idx: usize, grab: Vec2 },
     /// Editor: dragging the corner handle.
@@ -348,6 +382,12 @@ struct Fingers {
 
 #[derive(Resource, Default)]
 struct Held {
+    /// Mouse mode: a visible cursor that one finger drags and a tap clicks (for menus).
+    mouse: bool,
+    /// Mouse-mode cursor position, in logical pixels.
+    cursor: Vec2,
+    /// Stick knob per control: (shown offset, target offset), in logical pixels.
+    knobs: HashMap<usize, (Vec2, Vec2)>,
     /// WASD keys the stick currently holds.
     keys: HashSet<KeyCode>,
     /// Controls drawn as pressed.
@@ -522,6 +562,14 @@ fn route(
                         apply_panel(act, &mut editor, &mut layout);
                     }
                     Role::Ignore
+                } else if !editor.editing && mouse_area(w).contains(p) {
+                    held.mouse = !held.mouse;
+                    if held.mouse {
+                        held.cursor = Vec2::new(w, h) * 0.5;
+                        win.set_cursor_position(Some(held.cursor));
+                    }
+                    editor.dirty = true;
+                    Role::Ignore
                 } else if editor.editing {
                     match hit_control(&layout.items, w, h, p) {
                         Some(idx) => {
@@ -541,6 +589,7 @@ fn route(
                     held.pressed.insert(idx);
                     if item.stick {
                         let (center, radius) = geom(&item, w, h);
+                        held.knobs.entry(idx).or_default().1 = Vec2::ZERO;
                         Role::Stick { idx, center, radius }
                     } else {
                         let out = ACTIONS[item.action].out;
@@ -549,6 +598,8 @@ fn route(
                         }
                         Role::Button { idx, out }
                     }
+                } else if held.mouse {
+                    Role::Trackpad { last: p, moved: false, t0: Instant::now() }
                 } else {
                     Role::Pointer { start: p, last: p, moved: false, t0: Instant::now() }
                 };
@@ -557,8 +608,10 @@ fn route(
             TouchPhase::Moved => {
                 let Some(role) = fingers.roles.get_mut(&t.id) else { continue };
                 match role {
-                    Role::Stick { center, radius, .. } => {
-                        let d = (p - *center) / radius.max(1.0);
+                    Role::Stick { idx, center, radius } => {
+                        let raw = p - *center;
+                        held.knobs.entry(*idx).or_default().1 = raw.clamp_length_max(*radius * 0.6);
+                        let d = raw / radius.max(1.0);
                         let th = 0.3;
                         let mut want = HashSet::new();
                         if d.x > th {
@@ -591,6 +644,15 @@ fn route(
                         }
                         *last = p;
                     }
+                    Role::Trackpad { last, moved, .. } => {
+                        if !*moved && (p - *last).length() > 8.0 {
+                            *moved = true;
+                        }
+                        let next = (held.cursor + (p - *last) * 1.4).clamp(Vec2::ZERO, Vec2::new(w, h));
+                        held.cursor = next;
+                        win.set_cursor_position(Some(next));
+                        *last = p;
+                    }
                     Role::Move { idx, grab } => {
                         if let Some(c) = layout.items.get_mut(*idx) {
                             let np = p - *grab;
@@ -613,6 +675,7 @@ fn route(
                 let Some(role) = fingers.roles.remove(&t.id) else { continue };
                 match role {
                     Role::Stick { idx, .. } => {
+                        held.knobs.entry(idx).or_default().1 = Vec2::ZERO;
                         let keys: Vec<KeyCode> = held.keys.drain().collect();
                         for k in keys {
                             sink.send(Emit::Key(k, false));
@@ -630,6 +693,15 @@ fn route(
                         if !moved && t0.elapsed().as_millis() < 450 && !editor.editing && !on_panel {
                             // A tap: move the cursor there (menus read it) and click.
                             win.set_cursor_position(Some(p));
+                            sink.send(Emit::Mouse(MouseButton::Left, true));
+                            let release_at = held.frame + 2;
+                            held.pending.push((release_at, Emit::Mouse(MouseButton::Left, false)));
+                        }
+                    }
+                    Role::Trackpad { moved, t0, .. } => {
+                        if !moved && t0.elapsed().as_millis() < 450 {
+                            // A tap clicks where the cursor is (menus read the window's cursor).
+                            win.set_cursor_position(Some(held.cursor));
                             sink.send(Emit::Mouse(MouseButton::Left, true));
                             let release_at = held.frame + 2;
                             held.pending.push((release_at, Emit::Mouse(MouseButton::Left, false)));
@@ -659,6 +731,10 @@ struct TouchUi;
 #[derive(Component)]
 struct CtrlNode(usize);
 
+/// The knob inside the stick's base.
+#[derive(Component)]
+struct StickKnob(usize);
+
 fn font(px: f32) -> TextFont {
     TextFont { font_size: bevy::text::FontSize::Px(px), ..default() }
 }
@@ -668,6 +744,7 @@ fn rebuild(
     existing: Query<Entity, With<TouchUi>>,
     windows: Query<&Window, With<PrimaryWindow>>,
     layout: Res<TouchLayout>,
+    held: Res<Held>,
     mut editor: ResMut<TouchEditor>,
 ) {
     let Ok(win) = windows.single() else { return };
@@ -710,10 +787,36 @@ fn rebuild(
         .with_children(|p| {
             p.spawn((Text::new("UI"), font(15.0), TextColor(TEXT)));
         });
+    // Mouse-mode button.
+    if !editor.editing {
+        let m = mouse_area(w);
+        commands
+            .spawn((
+                TouchUi,
+                Node {
+                    position_type: PositionType::Absolute,
+                    left: px(m.min.x),
+                    top: px(m.min.y),
+                    width: px(m.max.x - m.min.x),
+                    height: px(m.max.y - m.min.y),
+                    border: UiRect::all(px(1.0)),
+                    border_radius: BorderRadius::MAX,
+                    justify_content: JustifyContent::Center,
+                    align_items: AlignItems::Center,
+                    ..default()
+                },
+                BackgroundColor(if held.mouse { ACCENT } else { Color::srgba(0.1, 0.11, 0.13, 0.6) }),
+                BorderColor::all(Color::srgba(1.0, 1.0, 1.0, 0.2)),
+                GlobalZIndex(Z),
+            ))
+            .with_children(|p| {
+                p.spawn((Text::new("MOUSE"), font(13.0), TextColor(TEXT)));
+            });
+    }
     // Controls.
     for (i, c) in layout.items.iter().enumerate() {
         let (centre, r) = geom(c, w, h);
-        let label = if c.stick { "MOVE".to_string() } else { c.label().to_string() };
+        let label = c.label().to_string();
         commands
             .spawn((
                 TouchUi,
@@ -735,7 +838,26 @@ fn rebuild(
                 GlobalZIndex(Z - 1),
             ))
             .with_children(|p| {
-                p.spawn((Text::new(label), font((r * 0.42).clamp(10.0, 24.0)), TextColor(TEXT)));
+                if c.stick {
+                    // The stick's knob: a child of the fixed base, moved by `paint`.
+                    p.spawn((
+                        StickKnob(i),
+                        Node {
+                            position_type: PositionType::Absolute,
+                            left: percent(22.5),
+                            top: percent(22.5),
+                            width: percent(55.0),
+                            height: percent(55.0),
+                            border: UiRect::all(px(2.0)),
+                            border_radius: BorderRadius::MAX,
+                            ..default()
+                        },
+                        BackgroundColor(Color::srgba(0.93, 0.93, 0.95, 0.5)),
+                        BorderColor::all(Color::srgba(1.0, 1.0, 1.0, 0.7)),
+                    ));
+                } else {
+                    p.spawn((Text::new(label), font((r * 0.42).clamp(10.0, 24.0)), TextColor(TEXT)));
+                }
             });
         if editor.editing {
             let hp = handle_pos(centre, r);
@@ -814,11 +936,27 @@ fn rebuild(
 
 /// Button colours follow the touches (pressed = accent) and the editor's selection.
 fn paint(
-    held: Res<Held>,
+    mut held: ResMut<Held>,
     layout: Res<TouchLayout>,
     editor: Res<TouchEditor>,
+    time: Res<Time>,
     mut q: Query<(&CtrlNode, &mut BackgroundColor, &mut BorderColor)>,
+    mut knobs: Query<(&StickKnob, &mut Node), Without<TouchCursor>>,
+    mut cursor: Query<(&mut Node, &mut Visibility), With<TouchCursor>>,
 ) {
+    // The knob eases toward its target (finger, or the centre on release): a spring feel.
+    let ease = 1.0 - (-time.delta_secs() * 25.0).exp();
+    for (knob, mut node) in &mut knobs {
+        let entry = held.knobs.entry(knob.0).or_default();
+        entry.0 = entry.0.lerp(entry.1, ease);
+        let off = entry.0;
+        node.margin = UiRect { left: px(off.x), top: px(off.y), ..default() };
+    }
+    if let Ok((mut node, mut vis)) = cursor.single_mut() {
+        *vis = if held.mouse { Visibility::Visible } else { Visibility::Hidden };
+        node.left = px(held.cursor.x - 10.0);
+        node.top = px(held.cursor.y - 10.0);
+    }
     for (node, mut bg, mut border) in &mut q {
         let Some(c) = layout.items.get(node.0) else { continue };
         let pressed = held.pressed.contains(&node.0);
