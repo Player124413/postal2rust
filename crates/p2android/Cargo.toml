@@ -12,5 +12,8 @@ crate-type = ["cdylib"]
 [dependencies]
 p2game = { path = "../p2game" }
 bevy = { version = "0.19", features = ["android-native-activity"] }
+# OpenGL ES backend (WGPU_BACKEND=gl). bevy_render does not enable wgpu/gles by default,
+# so without this the GL adapter is never compiled in ("Request adapter didn't find compatible adapters").
+bevy_render = { version = "0.19", features = ["gles"] }
 # Same global allocator as the desktop binary (the VM allocates a lot).
 mimalloc = { version = "0.1", default-features = false }
