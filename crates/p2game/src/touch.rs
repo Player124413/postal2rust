@@ -660,7 +660,10 @@ fn route(
                         if !*moved && (p - *last).length() > 8.0 {
                             *moved = true;
                         }
-                        let next = (held.cursor + (p - *last) * 1.4).clamp(Vec2::ZERO, Vec2::new(w, h));
+                        // Faster finger, faster cursor: slow moves are precise, long swipes cross the screen.
+                        let d = p - *last;
+                        let gain = 1.6 + (d.length() * 0.12).min(3.0);
+                        let next = (held.cursor + d * gain).clamp(Vec2::ZERO, Vec2::new(w, h));
                         held.cursor = next;
                         win.set_cursor_position(Some(next));
                         *last = p;
@@ -712,7 +715,9 @@ fn route(
                     }
                     Role::Trackpad { moved, t0, .. } => {
                         if !moved && t0.elapsed().as_millis() < 450 {
-                            // A tap clicks where the cursor is (menus read the window's cursor).
+                            // A tap jumps the cursor to the finger and clicks there (menus read the
+                            // window's cursor), so any button on the screen can be reached in one tap.
+                            held.cursor = p.clamp(Vec2::ZERO, Vec2::new(w, h));
                             win.set_cursor_position(Some(held.cursor));
                             sink.send(Emit::Mouse(MouseButton::Left, true));
                             let release_at = held.frame + 2;
