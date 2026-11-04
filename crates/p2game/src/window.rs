@@ -262,7 +262,14 @@ pub fn run(cfg: BootConfig, args: Args) {
     // Particles, fluids and decals from script (fx_glue.rs): the VM side pushes a snapshot per frame.
     let fxq = p2fx::FxFrameQueue::default();
     crate::fx_glue::set_frame_queue(fxq.0.clone());
-    app.add_plugins((p2fx::FxPlugin, p2fx::FxVmPlugin)).insert_resource(fxq).insert_resource(p2fx::render_vm::FxFirstPersonLayer(Some(crate::weapons::FP_LAYER)));
+    // Android: particles are off by default (android.cfg `fx=on` turns them back on). The GPU
+    // particle pass is the first suspect of the native crash on Adreno 710 (see the README).
+    if !cfg!(target_os = "android") || std::env::var_os("P2GAME_FX").is_some() {
+        app.add_plugins((p2fx::FxPlugin, p2fx::FxVmPlugin));
+    } else {
+        println!("fx: particles disabled on Android (set fx=on in android.cfg to enable)");
+    }
+    app.insert_resource(fxq).insert_resource(p2fx::render_vm::FxFirstPersonLayer(Some(crate::weapons::FP_LAYER)));
     app.add_plugins(crate::ui::UiPlugin)
         .add_plugins(crate::debug::DebugOverlayPlugin)
         .add_plugins(crate::devmenu::DevMenuPlugin)

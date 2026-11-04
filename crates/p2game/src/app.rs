@@ -539,6 +539,14 @@ pub fn android_main(data_dir: PathBuf) {
                 unsafe { std::env::set_var("P2GAME_FPS_LIMIT", v) };
             }
             // `audio=off` runs without the OS audio device (diagnostics).
+            if line.trim() == "fx=on" {
+                // SAFETY: as above.
+                unsafe { std::env::set_var("P2GAME_FX", "1") };
+            }
+            if line.trim() == "grade=on" {
+                // SAFETY: as above.
+                unsafe { std::env::set_var("P2GAME_GRADE", "1") };
+            }
             if line.trim() == "audio=off" {
                 // SAFETY: as above.
                 unsafe { std::env::set_var("P2GAME_NO_AUDIO", "1") };

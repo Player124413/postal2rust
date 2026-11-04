@@ -541,7 +541,9 @@ fn apply(
     *first = true;
     let v = video();
     if let Ok(e) = canvas.single() {
-        match Grade::of(&v) {
+        // Android: the grade pass is off unless android.cfg says `grade=on` (P2GAME_GRADE).
+        let grade = if cfg!(target_os = "android") && std::env::var_os("P2GAME_GRADE").is_none() { None } else { Grade::of(&v) };
+        match grade {
             Some(g) => {
                 commands.entity(e).insert(g);
             }
