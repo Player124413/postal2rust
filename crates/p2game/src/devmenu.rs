@@ -274,7 +274,6 @@ fn spawn_panel(mut commands: Commands) {
     // world content.
     commands.spawn((
         Camera2d,
-        if cfg!(target_os = "android") { bevy::render::view::Msaa::Off } else { bevy::render::view::Msaa::default() },
         Camera { order: 200, clear_color: ClearColorConfig::None, ..default() },
         bevy::camera::visibility::RenderLayers::layer(30),
         IsDefaultUiCamera,

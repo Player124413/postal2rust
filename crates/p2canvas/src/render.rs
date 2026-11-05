@@ -246,7 +246,6 @@ fn spawn_camera(mut commands: Commands, clear: Res<CanvasClear>, existing: Query
     };
     commands.spawn((
         Camera2d,
-        if cfg!(target_os = "android") { bevy::render::view::Msaa::Off } else { bevy::render::view::Msaa::default() },
         Camera { order: 100, clear_color, ..default() },
         Projection::Orthographic(OrthographicProjection { scaling_mode: ScalingMode::Fixed { width: 640.0, height: 480.0 }, ..OrthographicProjection::default_2d() }),
         CanvasCamera,

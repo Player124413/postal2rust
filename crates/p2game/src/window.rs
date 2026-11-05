@@ -700,7 +700,6 @@ fn load_scene(
     let yaw = (-dir.z).atan2(dir.x);
     commands.spawn((
         Camera3d::default(),
-        if cfg!(target_os = "android") { bevy::render::view::Msaa::Off } else { bevy::render::view::Msaa::default() },
         Projection::Perspective(PerspectiveProjection { fov: 75f32.to_radians(), far: 1500.0, ..default() }),
         DistanceFog { color: fog_color, falloff: fog_falloff, ..default() },
         Transform::from_translation(pos + Vec3::Y * 1.2).with_rotation(cam_rot(yaw, 0.0)),
