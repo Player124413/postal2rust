@@ -577,6 +577,10 @@ fn route(
                 } else if MENU_UP.load(Ordering::Relaxed) && !editor.editing {
                     // A menu is open: the finger is the cursor, under it from the start.
                     menu_cursor_to(&mut held, &mut sink, &mut win, p, Vec2::new(w, h));
+                    println!(
+                        "touch-menu: touch {:.0},{:.0} window {w:.0}x{h:.0} physical {}x{} scale {:.2} cursor {:.0},{:.0}",
+                        p.x, p.y, win.physical_width(), win.physical_height(), win.scale_factor(), held.cursor.x, held.cursor.y
+                    );
                     Role::MenuTouch { start: p, t0: Instant::now(), moved: false, pressed: false }
                 } else if editor.editing {
                     match hit_control(&layout.items, w, h, p) {
