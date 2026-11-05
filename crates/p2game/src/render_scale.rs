@@ -124,7 +124,7 @@ fn sync_world_size(
     }
     world.size = physical;
     let size = world_size(window, scale.0);
-    if let Some(image) = images.get_mut(&world.handle) {
+    if let Some(mut image) = images.get_mut(&world.handle) {
         image.resize(Extent3d { width: size.x, height: size.y, depth_or_array_layers: 1 });
     }
     for mut sprite in &mut sprites {
