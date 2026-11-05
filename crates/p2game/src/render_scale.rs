@@ -12,6 +12,7 @@ use bevy::camera::visibility::RenderLayers;
 use bevy::camera::{Camera, ClearColorConfig, ImageRenderTarget, RenderTarget};
 use bevy::image::ImageSampler;
 use bevy::prelude::*;
+use bevy::window::PrimaryWindow;
 use bevy::render::render_resource::{Extent3d, TextureFormat};
 
 /// The layer the display sprite lives on; only the display camera draws it.
@@ -68,7 +69,7 @@ fn ensure_display(
     mut commands: Commands,
     mut images: ResMut<Assets<Image>>,
     scale: Res<WorldScale>,
-    windows: Query<&Window, With<bevy::window::PrimaryWindow>>,
+    windows: Query<&Window, With<PrimaryWindow>>,
     existing: Option<Res<WorldImage>>,
 ) {
     if existing.is_some() {
@@ -97,25 +98,26 @@ fn ensure_display(
 }
 
 /// Points every world camera at the world image (they were spawned with the window as target).
-fn retarget_world_cameras(world: Option<Res<WorldImage>>, mut cams: Query<(&mut Camera, &Camera3d)>) {
+fn retarget_world_cameras(world: Option<Res<WorldImage>>, mut cams: Query<(&Camera, &mut RenderTarget), With<Camera3d>>) {
     let Some(world) = world else { return };
-    for (mut cam, _) in &mut cams {
-        if cam.order >= WORLD_MAX_ORDER || !matches!(cam.target, RenderTarget::Window(_)) {
+    for (cam, mut target) in &mut cams {
+        if cam.order >= WORLD_MAX_ORDER || !matches!(*target, RenderTarget::Window(_)) {
             continue;
         }
-        cam.target = RenderTarget::Image(ImageRenderTarget { handle: world.handle.clone(), scale_factor: 1.0 });
+        *target = RenderTarget::Image(ImageRenderTarget { handle: world.handle.clone(), scale_factor: 1.0 });
     }
 }
 
 /// Keeps the world image and the display sprite matched to the window size (rotation, resize).
 fn sync_world_size(
-    mut world: Option<ResMut<WorldImage>>,
+    world: Option<ResMut<WorldImage>>,
     mut images: ResMut<Assets<Image>>,
     scale: Res<WorldScale>,
-    windows: Query<&Window, With<bevy::window::PrimaryWindow>>,
+    windows: Query<&Window, With<PrimaryWindow>>,
     mut sprites: Query<&mut Sprite, With<DisplaySprite>>,
 ) {
-    let (Some(world), Ok(window)) = (world.as_mut(), windows.single()) else { return };
+    let Some(mut world) = world else { return };
+    let Ok(window) = windows.single() else { return };
     let physical = UVec2::new(window.physical_width(), window.physical_height());
     if physical == world.size || physical.x == 0 || physical.y == 0 {
         return;
