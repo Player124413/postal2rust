@@ -576,8 +576,7 @@ fn route(
                     Role::Ignore
                 } else if MENU_UP.load(Ordering::Relaxed) && !editor.editing {
                     // A menu is open: the finger is the cursor, under it from the start.
-                    held.cursor = p.clamp(Vec2::ZERO, Vec2::new(w, h));
-                    win.set_cursor_position(Some(held.cursor));
+                    menu_cursor_to(&mut held, &mut sink, &mut win, p, Vec2::new(w, h));
                     Role::MenuTouch { start: p, t0: Instant::now(), moved: false, pressed: false }
                 } else if editor.editing {
                     match hit_control(&layout.items, w, h, p) {
@@ -655,8 +654,7 @@ fn route(
                         if !*moved && (p - *start).length() > 12.0 {
                             *moved = true;
                         }
-                        held.cursor = p.clamp(Vec2::ZERO, Vec2::new(w, h));
-                        win.set_cursor_position(Some(held.cursor));
+                        menu_cursor_to(&mut held, &mut sink, &mut win, p, Vec2::new(w, h));
                         if *moved && !*pressed {
                             // A drag in a menu (slider, list): hold the button from here on.
                             *pressed = true;
@@ -732,6 +730,18 @@ fn route(
 // UI: the gear button, the controls, the editor panel. Rebuilt when something changes.
 
 const Z: i32 = i32::MAX - 10;
+/// Moves the menu cursor to `p` (clamped to the window) and reports the same move as a relative
+/// mouse motion, the way a real mouse would: UWindow tracks the pointer from both.
+fn menu_cursor_to(held: &mut Held, sink: &mut Sink, win: &mut Window, p: Vec2, size: Vec2) {
+    let before = held.cursor;
+    held.cursor = p.clamp(Vec2::ZERO, size);
+    win.set_cursor_position(Some(held.cursor));
+    let d = held.cursor - before;
+    if d != Vec2::ZERO {
+        sink.send(Emit::Motion(d));
+    }
+}
+
 /// A tap shorter than this clicks (Pojav's touchpad uses the same window).
 const TAP_MS: u128 = 300;
 /// Set each frame by `ui.rs`: true while a menu or a load/map screen is up.
