@@ -100,6 +100,8 @@ pub(crate) fn ui_frame(
     }
     let out = ui.front.frame(&mut sim.game, FrameInput { events: &events, typed: &typed, mouse: mouse_pos, width: w, height: h, dt });
     capture.captured = out.captured;
+    // Touch: while a menu is up, a finger is a touchscreen for it (see touch.rs).
+    crate::touch::set_menu_up(out.captured);
     capture.game_look = out.game_look;
     capture.player_view = out.player_view;
     if let Some(p) = out.mouse_warp {
