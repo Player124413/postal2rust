@@ -389,6 +389,7 @@ pub fn spawn_outdoor(commands: &mut Commands, s: OutdoorSpawn, build_mesh: fn(&M
             }
             world.spawn((
                 Camera3d::default(),
+                if cfg!(target_os = "android") { bevy::render::view::Msaa::Off } else { bevy::render::view::Msaa::default() },
                 Camera { order: -1, ..default() },
                 Projection::Perspective(PerspectiveProjection { fov: 75f32.to_radians(), near: 0.1, far: 4000.0, ..default() }),
                 Transform::from_translation(sky.origin),

@@ -40,7 +40,7 @@ fn empty_scene() {
         .add_plugins(DefaultPlugins)
         .insert_resource(ClearColor(Color::srgb(0.2, 0.4, 0.8)))
         .add_systems(Startup, |mut commands: Commands| {
-            commands.spawn(Camera2d);
+            commands.spawn((Camera2d, if cfg!(target_os = "android") { bevy::render::view::Msaa::Off } else { bevy::render::view::Msaa::default() }));
         })
         .run();
 }

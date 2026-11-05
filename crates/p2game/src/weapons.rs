@@ -611,6 +611,7 @@ fn canvas_meshes(
         let e = commands
             .spawn((
                 Camera3d::default(),
+                if cfg!(target_os = "android") { bevy::render::view::Msaa::Off } else { bevy::render::view::Msaa::default() },
                 Camera { order: 110, clear_color: ClearColorConfig::None, is_active: false, ..default() },
                 Projection::Perspective(PerspectiveProjection { fov: 60f32.to_radians(), near: 0.02, far: 100.0, ..default() }),
                 Transform::IDENTITY,
@@ -849,6 +850,7 @@ fn fp_weapon(
     if cams.is_empty() {
         commands.spawn((
             Camera3d::default(),
+            if cfg!(target_os = "android") { bevy::render::view::Msaa::Off } else { bevy::render::view::Msaa::default() },
             // Above the world (0) and sky (-1), below the 2D canvas (100); no colour clear, fresh depth.
             Camera { order: 50, clear_color: ClearColorConfig::None, ..default() },
             Projection::Perspective(PerspectiveProjection { fov: 60f32.to_radians(), near: 0.02, far: 100.0, ..default() }),
