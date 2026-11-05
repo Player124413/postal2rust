@@ -75,6 +75,7 @@ pub mod window_memory;
 pub mod zone_fog;
 #[cfg(feature = "window")]
 pub mod touch;
+pub mod render_scale;
 
 #[cfg(feature = "window")]
 pub(crate) use app::map_list;

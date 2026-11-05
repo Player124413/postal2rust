@@ -278,6 +278,7 @@ pub fn run(cfg: BootConfig, args: Args) {
         .add_plugins(crate::weapons::WeaponsPlugin)
         .add_plugins(crate::realinput::RealInputPlugin)
         .add_plugins(crate::touch::TouchPlugin)
+        .add_plugins(crate::render_scale::RenderScalePlugin)
         .add_plugins(crate::pilot::PilotPlugin)
         .add_plugins(crate::tour::TourPlugin)
         .add_plugins(outdoor::OutdoorPlugin)
