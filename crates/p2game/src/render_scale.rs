@@ -6,7 +6,7 @@
 //! on its own render layer. The 2D canvas (order 100), the menus and the touch controls stay at
 //! full resolution, so text and the HUD stay sharp.
 //!
-//! `P2GAME_RENDER_SCALE` sets the factor (1.0 turns the feature off). On Android it defaults to 0.6.
+//! `P2GAME_RENDER_SCALE` sets the factor (1.0 = off, the default for now).
 
 use bevy::camera::visibility::RenderLayers;
 use bevy::camera::{Camera, ClearColorConfig, ImageRenderTarget, RenderTarget};
@@ -49,7 +49,9 @@ struct WorldImage {
 struct DisplaySprite;
 
 fn scale_factor() -> f32 {
-    let default = if cfg!(target_os = "android") { 0.6 } else { 1.0 };
+    // Off by default: on the phone the world image is not shown in gameplay (black screen with
+    // the scale on). Enable with P2GAME_RENDER_SCALE=0.6 while it is being fixed.
+    let default = 1.0;
     std::env::var("P2GAME_RENDER_SCALE")
         .ok()
         .and_then(|v| v.parse::<f32>().ok())
