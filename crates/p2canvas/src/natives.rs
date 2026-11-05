@@ -699,19 +699,6 @@ impl MenuHost {
         // last saw it (top left) and clicks never reached the menu buttons.
         if let Some(root) = self.base_menu {
             let scale = vm.get_prop(root, "GUIScale").map(|v| v.as_float()).filter(|s| *s > 0.0).unwrap_or(1.0);
-            // Diagnostics (every 30 frames): what the menu had before we wrote, to see whether UWindow
-            // overwrites our position.
-            thread_local!(static MOUSE_DBG: std::cell::Cell<u32> = const { std::cell::Cell::new(0) });
-            let n = MOUSE_DBG.with(|c| {
-                let v = c.get().wrapping_add(1);
-                c.set(v);
-                v
-            });
-            if n % 30 == 1 {
-                let before_x = vm.get_prop(root, "MouseX").map(|v| v.as_float());
-                let before_y = vm.get_prop(root, "MouseY").map(|v| v.as_float());
-                println!("mouse-dbg: finger/cursor ({x:.0},{y:.0}) GUIScale {scale} root MouseX/Y before write {before_x:?}/{before_y:?}");
-            }
             vm.set_prop(root, "MouseX", Value::Float(x / scale));
             vm.set_prop(root, "MouseY", Value::Float(y / scale));
         }

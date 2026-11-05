@@ -106,6 +106,9 @@ pub(crate) fn ui_frame(
     crate::touch::set_menu_up(out.captured);
     capture.game_look = out.game_look;
     capture.player_view = out.player_view;
+    // Android: Winit cannot warp the cursor (it logged an error every frame); touch already
+    // places the menu cursor directly (touch.rs `menu_cursor_to`), so the warp is desktop-only.
+    #[cfg(not(target_os = "android"))]
     if let Some(p) = out.mouse_warp {
         // Script coordinates are physical pixels, like the canvas.
         win.set_physical_cursor_position(Some(bevy::math::DVec2::new(p.0 as f64, p.1 as f64)));
