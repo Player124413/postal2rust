@@ -81,7 +81,9 @@ pub(crate) fn ui_frame(
     let mut events = p2input::bevy_map::collect_events(&keys, &mouse, motion.delta, scroll.delta.y, &[]);
     let shift = keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight);
     let mut typed: Vec<char> = keys.get_just_pressed().filter_map(|k| keycode_char(*k, shift)).collect();
-    let mut mouse_pos = win.cursor_position().map(|p| (p.x, p.y));
+    // The menu canvas is in physical pixels (`w`, `h` above), so the cursor must be too: `cursor_position`
+    // is in logical pixels, which are smaller by the window's scale factor (3.25 on the phone).
+    let mut mouse_pos = win.physical_cursor_position().map(|p| (p.x, p.y));
     // Scripted test runs (P2GAME_EXEC/HOLD) ignore the OS keyboard and mouse: whatever window
     // has focus on the desktop would otherwise move, fire or even suicide the player. (P2GAME_REAL
     // and P2GAME_PILOT inject their input as OS input and drop the real OS input themselves.)
@@ -105,7 +107,8 @@ pub(crate) fn ui_frame(
     capture.game_look = out.game_look;
     capture.player_view = out.player_view;
     if let Some(p) = out.mouse_warp {
-        win.set_cursor_position(Some(Vec2::new(p.0, p.1)));
+        // Script coordinates are physical pixels, like the canvas.
+        win.set_physical_cursor_position(Some(Vec2::new(p.0, p.1)));
     }
     // Matinee `SubActionTitle` overlays (the intro's credit titles): the engine draws camera
     // effects over the rendered frame, after the HUD.
