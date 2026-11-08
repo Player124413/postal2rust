@@ -13,7 +13,7 @@ fn main() {
     let lib = Library::new(&game).unwrap();
     let path = lib.map_path(&a[1]).expect("map");
     let map = Arc::new(upkg::Package::open(&path).unwrap());
-    let data = build_scene(&lib, &map, &Options { gpu_bc: false, gpu_astc: false, projectors: true }).unwrap();
+    let data = build_scene(&lib, &map, &Options { gpu_bc: false, projectors: true }).unwrap();
     let Some(sky) = &data.sky else {
         println!("no sky");
         return;

@@ -110,7 +110,7 @@ fn load_map(
     let lib = Library::new(&args.game).unwrap_or_else(|e| panic!("cannot index game install at {}: {e}", args.game.display()));
     let path = lib.map_path(&args.map).unwrap_or_else(|| panic!("map '{}' not found under {}", args.map, args.game.display()));
     let map = Arc::new(upkg::Package::open(&path).unwrap_or_else(|e| panic!("cannot open {}: {e}", path.display())));
-    let data = scene::build_scene(&lib, &map, &Options { gpu_bc, gpu_astc: false, projectors: true }).unwrap_or_else(|e| panic!("cannot build scene: {e}"));
+    let data = scene::build_scene(&lib, &map, &Options { gpu_bc, projectors: true }).unwrap_or_else(|e| panic!("cannot build scene: {e}"));
     let s = &data.stats;
     println!(
         "LOADED {} in {} ms: bsp_polys={} static_mesh_actors={} unique_meshes={} mesh_sections={} instances={} world_batches={} materials={} textures={} (gpu-bc={}) unresolved_refs={}",

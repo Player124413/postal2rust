@@ -11,7 +11,7 @@ fn main() {
     let lib = Library::new(std::path::Path::new(&game)).expect("game install");
     let path = lib.map_path(&map).expect("map");
     let pkg = Arc::new(upkg::Package::open(&path).expect("open map"));
-    let data = build_scene(&lib, &pkg, &Options { gpu_bc: false, gpu_astc: false, projectors: false }).expect("scene");
+    let data = build_scene(&lib, &pkg, &Options { gpu_bc: false, projectors: false }).expect("scene");
     let mut n = 0;
     for (i, m) in data.materials.iter().enumerate() {
         if m.frames.len() > 1 {

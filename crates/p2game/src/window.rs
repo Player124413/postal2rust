@@ -588,12 +588,7 @@ fn load_scene(
     // Android: BC (DXT) textures are always decoded to RGBA8 here. The Adreno driver crashed (SIGSEGV)
     // in the first frames of the level, and BC is not a format Adreno GPUs support.
     let gpu_bc = !cfg!(target_os = "android") && bc.as_ref().is_some_and(|s| s.0.contains(CompressedImageFormats::BC));
-    // Android: DXT -> ASTC 4x4 re-encode (scene.rs `encode_astc`) is OFF by default: a build with it
-    // crashed on "Play" on the test phone. Enable with `P2GAME_ASTC=1` for testing; the RGBA8 path is the default.
-    let gpu_astc = cfg!(target_os = "android")
-        && std::env::var_os("P2GAME_ASTC").is_some()
-        && bc.as_ref().is_some_and(|s| s.0.contains(CompressedImageFormats::ASTC_LDR));
-    println!("textures: BC on GPU = {gpu_bc}, ASTC on GPU = {gpu_astc}");
+    println!("textures: BC on GPU = {gpu_bc}");
     let lib = sim.game.host.lib.clone();
     // After a save load the level package is the save (its actors), but the geometry, terrain and
     // lightmaps are the original map's: the host's map package (the save loader picks it from the
@@ -609,7 +604,7 @@ fn load_scene(
         sim.dynmesh.set_lighting(crate::dynmesh::ActorLighting::new(&map, &level_actors));
         sim.dynmesh.start_bake_ahead(&lib, &sim.game.world.vm, &map, &level_actors, sim.game.player_controller);
     }
-    let mut data = scene::build_scene(&lib, &map, &scene::Options { gpu_bc, gpu_astc, projectors: false }).unwrap_or_else(|e| panic!("scene: {e}"));
+    let mut data = scene::build_scene(&lib, &map, &scene::Options { gpu_bc, projectors: false }).unwrap_or_else(|e| panic!("scene: {e}"));
     let t_build = t0.elapsed().as_secs_f32();
     let merge = std::env::var_os("P2GAME_NO_MERGE").is_none();
     let mut spawned = spawn::spawn_scene_with(&mut commands, &mut data, spawn::SpawnOptions { unlit: args.unlit, baked: true, merge }, &mut images, &mut meshes, &mut materials);
@@ -730,11 +725,8 @@ fn tick_script(time: Res<Time>, keys: Res<ButtonInput<KeyCode>>, ui: Res<crate::
     if !crate::frontend::travel_accepted(sim.game.level_serial, sim.game.player_controller) {
         return;
     }
-    // Clamp long frames (asset upload stalls). A long step moves physics and the pawn by that much
-    // in one tick: on the phone, the first frames after a level travel (40-200 ms) pushed the
-    // player into walls and floors. 1/30 s keeps a stall a slow-motion frame, not a jump; normal
-    // 60 fps frames are unchanged, so desktop behaves the same.
-    let dt = time.delta_secs().clamp(0.0, 1.0 / 30.0);
+    // Clamp long frames (asset upload stalls) the way the engine caps its tick delta.
+    let dt = time.delta_secs().clamp(0.0, 0.2);
     let t_tick = std::time::Instant::now();
     sim.game.tick(dt);
     if let Some(lim) = std::env::var("P2GAME_SPIKES").ok().and_then(|s| s.parse::<f64>().ok()) {
@@ -1128,14 +1120,6 @@ fn report(
             }
             if fr.smooth_travel == 10 {
                 println!("load: travel to first interactive frame {:.2} s", t.elapsed().as_secs_f32());
-                // Where the local pawn stands after the travel (a spawn inside a wall shows here).
-                let vm = &sim.game.world.vm;
-                if let Some(pc) = crate::ai::local_player_controller(vm) {
-                    if let Some(pawn) = vm.get_prop(pc, "Pawn").and_then(|v| v.as_obj()) {
-                        let l = vm.actor_loc(pawn);
-                        println!("travel: pawn {} at ({:.0},{:.0},{:.0})", vm.object_name(pawn), l[0], l[1], l[2]);
-                    }
-                }
                 *ts = None;
                 fr.smooth_travel = 0;
             }
@@ -1184,14 +1168,6 @@ fn report(
             crate::physics::NAV_STUCK.with(|c| c.get()),
             crate::physics::NAV_DEFLECT.with(|c| c.get())
         );
-        // Names of the script natives the game does not implement (the top five), so a phone log
-        // says what is missing. Cumulative since the level started.
-        if !vm.missing_natives.is_empty() {
-            let mut top: Vec<_> = vm.missing_natives.iter().collect();
-            top.sort_by(|a, b| b.1.cmp(a.1).then(a.0.cmp(b.0)));
-            let names: Vec<String> = top.iter().take(5).map(|(k, v)| format!("{k} x{v}")).collect();
-            println!("missing natives: {}", names.join(", "));
-        }
         // Frame time split: game phases (script, anim, each frame hook) vs the whole frame.
         let frame_ms = span * 1000.0 / fr.wall_frames.max(1) as f64;
         fr.wall_frames = 0;

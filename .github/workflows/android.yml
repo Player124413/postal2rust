@@ -44,7 +44,7 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p ci-logs
-          cargo check -p p2game 2>&1 | tee ci-logs/cargo-check.log
+          cargo check --locked -p p2game 2>&1 | tee ci-logs/cargo-check.log
       - name: Report errors as annotations
         if: failure()
         shell: bash

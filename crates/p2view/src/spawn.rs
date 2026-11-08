@@ -10,7 +10,7 @@ use bevy::camera::visibility::VisibilityRange;
 use bevy::image::{ImageAddressMode, ImageFilterMode, ImageSampler, ImageSamplerDescriptor};
 use bevy::mesh::{Indices, PrimitiveTopology};
 use bevy::prelude::*;
-use bevy::render::render_resource::{AstcBlock, AstcChannel, Extent3d, TextureDimension, TextureFormat};
+use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use std::collections::HashMap;
 
 pub fn make_image(t: &scene::TexData) -> Image {
@@ -18,7 +18,6 @@ pub fn make_image(t: &scene::TexData) -> Image {
         PixelFormat::Bc1 => TextureFormat::Bc1RgbaUnormSrgb,
         PixelFormat::Bc2 => TextureFormat::Bc2RgbaUnormSrgb,
         PixelFormat::Bc3 => TextureFormat::Bc3RgbaUnormSrgb,
-        PixelFormat::Astc4x4 => TextureFormat::Astc { block: AstcBlock::B4x4, channel: AstcChannel::UnormSrgb },
         PixelFormat::Rgba8 => TextureFormat::Rgba8UnormSrgb,
     };
     let size = Extent3d { width: t.width, height: t.height, depth_or_array_layers: 1 };
