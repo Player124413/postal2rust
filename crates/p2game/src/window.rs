@@ -1120,6 +1120,14 @@ fn report(
             }
             if fr.smooth_travel == 10 {
                 println!("load: travel to first interactive frame {:.2} s", t.elapsed().as_secs_f32());
+                // Where the local pawn stands after the travel (a spawn inside a wall shows here).
+                let vm = &sim.game.world.vm;
+                if let Some(pc) = crate::ai::local_player_controller(vm) {
+                    if let Some(pawn) = vm.get_prop(pc, "Pawn").and_then(|v| v.as_obj()) {
+                        let l = vm.actor_loc(pawn);
+                        println!("travel: pawn {} at ({:.0},{:.0},{:.0})", vm.object_name(pawn), l[0], l[1], l[2]);
+                    }
+                }
                 *ts = None;
                 fr.smooth_travel = 0;
             }
