@@ -204,6 +204,21 @@ pub fn spawn_new_rigs(
         tracker.rigs.insert(a, e);
         n += 1;
     }
+    // Android: every 5 s, how the level's pawns (NPCs) fare: with a mesh, with a rig, hidden.
+    // The "rigs:" line in window.rs only prints in the first frames, so this is the only report.
+    if cfg!(target_os = "android") && tracker.frames % 300 == 0 {
+        let (mut pawns, mut meshed, mut rigged, mut hidden) = (0usize, 0usize, 0usize, 0usize);
+        for &a in &vm.actors {
+            if vm.objects[a].deleted || !vm.class_is_a(vm.objects[a].class, "Pawn") {
+                continue;
+            }
+            pawns += 1;
+            meshed += is_mesh_actor(vm, a) as usize;
+            rigged += tracker.rigs.contains_key(&a) as usize;
+            hidden += render_hidden(vm, a) as usize;
+        }
+        println!("rigs-diag: pawns {pawns} with mesh {meshed} rigged {rigged} hidden {hidden} rig failures {}", tracker.failed);
+    }
     let mut swaps = std::mem::take(&mut tracker.material_swaps);
     refresh_skins(host, vm, tracker, cache, assets, &mut swaps);
     for (s, mat) in swaps.drain(..) {
