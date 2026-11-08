@@ -725,8 +725,11 @@ fn tick_script(time: Res<Time>, keys: Res<ButtonInput<KeyCode>>, ui: Res<crate::
     if !crate::frontend::travel_accepted(sim.game.level_serial, sim.game.player_controller) {
         return;
     }
-    // Clamp long frames (asset upload stalls) the way the engine caps its tick delta.
-    let dt = time.delta_secs().clamp(0.0, 0.2);
+    // Clamp long frames (asset upload stalls). A long step moves physics and the pawn by that much
+    // in one tick: on the phone, the first frames after a level travel (40-200 ms) pushed the
+    // player into walls and floors. 1/30 s keeps a stall a slow-motion frame, not a jump; normal
+    // 60 fps frames are unchanged, so desktop behaves the same.
+    let dt = time.delta_secs().clamp(0.0, 1.0 / 30.0);
     let t_tick = std::time::Instant::now();
     sim.game.tick(dt);
     if let Some(lim) = std::env::var("P2GAME_SPIKES").ok().and_then(|s| s.parse::<f64>().ok()) {
