@@ -588,10 +588,10 @@ fn load_scene(
     // Android: BC (DXT) textures are always decoded to RGBA8 here. The Adreno driver crashed (SIGSEGV)
     // in the first frames of the level, and BC is not a format Adreno GPUs support.
     let gpu_bc = !cfg!(target_os = "android") && bc.as_ref().is_some_and(|s| s.0.contains(CompressedImageFormats::BC));
-    // Android: no BC, but most phones have ASTC. DXT is re-encoded to ASTC 4x4 once at load (see
-    // scene.rs `encode_astc`). `P2GAME_NO_ASTC=1` falls back to the RGBA8 decode path.
+    // Android: DXT -> ASTC 4x4 re-encode (scene.rs `encode_astc`) is OFF by default: a build with it
+    // crashed on "Play" on the test phone. Enable with `P2GAME_ASTC=1` for testing; the RGBA8 path is the default.
     let gpu_astc = cfg!(target_os = "android")
-        && std::env::var_os("P2GAME_NO_ASTC").is_none()
+        && std::env::var_os("P2GAME_ASTC").is_some()
         && bc.as_ref().is_some_and(|s| s.0.contains(CompressedImageFormats::ASTC_LDR));
     println!("textures: BC on GPU = {gpu_bc}, ASTC on GPU = {gpu_astc}");
     let lib = sim.game.host.lib.clone();
