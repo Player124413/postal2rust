@@ -1168,6 +1168,14 @@ fn report(
             crate::physics::NAV_STUCK.with(|c| c.get()),
             crate::physics::NAV_DEFLECT.with(|c| c.get())
         );
+        // Names of the script natives the game does not implement (the top five), so a phone log
+        // says what is missing. Cumulative since the level started.
+        if !vm.missing_natives.is_empty() {
+            let mut top: Vec<_> = vm.missing_natives.iter().collect();
+            top.sort_by(|a, b| b.1.cmp(a.1).then(a.0.cmp(b.0)));
+            let names: Vec<String> = top.iter().take(5).map(|(k, v)| format!("{k} x{v}")).collect();
+            println!("missing natives: {}", names.join(", "));
+        }
         // Frame time split: game phases (script, anim, each frame hook) vs the whole frame.
         let frame_ms = span * 1000.0 / fr.wall_frames.max(1) as f64;
         fr.wall_frames = 0;
