@@ -161,7 +161,9 @@ pub fn spawn_new_rigs(
         }
         tracker.seen.insert(a);
         if !is_mesh_actor(vm, a) || !host.ensure(vm, a) {
-            if std::env::var_os("P2GAME_RIGS").is_some() && vm.class_is_a(vm.objects[a].class, "Pawn") {
+            // Android always logs skipped pawns (once per actor): NPCs are invisible there and the
+            // launcher overwrites android.cfg, so no env switch can be set on the phone.
+            if (std::env::var_os("P2GAME_RIGS").is_some() || cfg!(target_os = "android")) && vm.class_is_a(vm.objects[a].class, "Pawn") {
                 println!(
                     "skip pawn {a} {}: mesh_actor={} ensure={} DrawType={:?} Mesh={:?}",
                     vm.classes[vm.objects[a].class].name,
