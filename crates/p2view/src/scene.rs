@@ -1701,6 +1701,7 @@ fn load_texture_opacity(o: &Obj, op: &Obj) -> TexData {
     t
 }
 
+#[cfg(target_os = "android")]
 thread_local! {
     /// One encoder per thread (creating it is the expensive part).
     static ASTC_CTX: std::cell::RefCell<Option<astcenc_rs::Context>> = const { std::cell::RefCell::new(None) };
