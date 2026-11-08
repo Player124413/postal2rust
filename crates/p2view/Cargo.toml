@@ -13,3 +13,7 @@ p2sound = { path = "../p2sound" }
 p2fx = { path = "../p2fx" }
 bevy = "0.19"
 rayon = "1"
+
+[target.'cfg(target_os = "android")'.dependencies]
+# ASTC encoder for phones without BC support (see scene.rs `encode_astc`).
+astcenc-rs = "0.2"

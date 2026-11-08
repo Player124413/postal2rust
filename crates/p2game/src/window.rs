@@ -588,7 +588,12 @@ fn load_scene(
     // Android: BC (DXT) textures are always decoded to RGBA8 here. The Adreno driver crashed (SIGSEGV)
     // in the first frames of the level, and BC is not a format Adreno GPUs support.
     let gpu_bc = !cfg!(target_os = "android") && bc.as_ref().is_some_and(|s| s.0.contains(CompressedImageFormats::BC));
-    println!("textures: BC on GPU = {gpu_bc}");
+    // Android: no BC, but most phones have ASTC. DXT is re-encoded to ASTC 4x4 once at load (see
+    // scene.rs `encode_astc`). `P2GAME_NO_ASTC=1` falls back to the RGBA8 decode path.
+    let gpu_astc = cfg!(target_os = "android")
+        && std::env::var_os("P2GAME_NO_ASTC").is_none()
+        && bc.as_ref().is_some_and(|s| s.0.contains(CompressedImageFormats::ASTC_LDR));
+    println!("textures: BC on GPU = {gpu_bc}, ASTC on GPU = {gpu_astc}");
     let lib = sim.game.host.lib.clone();
     // After a save load the level package is the save (its actors), but the geometry, terrain and
     // lightmaps are the original map's: the host's map package (the save loader picks it from the
@@ -604,7 +609,7 @@ fn load_scene(
         sim.dynmesh.set_lighting(crate::dynmesh::ActorLighting::new(&map, &level_actors));
         sim.dynmesh.start_bake_ahead(&lib, &sim.game.world.vm, &map, &level_actors, sim.game.player_controller);
     }
-    let mut data = scene::build_scene(&lib, &map, &scene::Options { gpu_bc, projectors: false }).unwrap_or_else(|e| panic!("scene: {e}"));
+    let mut data = scene::build_scene(&lib, &map, &scene::Options { gpu_bc, gpu_astc, projectors: false }).unwrap_or_else(|e| panic!("scene: {e}"));
     let t_build = t0.elapsed().as_secs_f32();
     let merge = std::env::var_os("P2GAME_NO_MERGE").is_none();
     let mut spawned = spawn::spawn_scene_with(&mut commands, &mut data, spawn::SpawnOptions { unlit: args.unlit, baked: true, merge }, &mut images, &mut meshes, &mut materials);

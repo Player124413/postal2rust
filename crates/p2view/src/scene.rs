@@ -32,6 +32,8 @@ pub enum PixelFormat {
     Bc1,
     Bc2,
     Bc3,
+    /// ASTC 4x4 LDR, sRGB (BC re-encoded on the phone, see `encode_astc`).
+    Astc4x4,
     Rgba8,
 }
 
@@ -269,6 +271,8 @@ pub struct SceneData {
 pub struct Options {
     /// Upload DXT textures compressed (GPU block compression) instead of decoding to RGBA.
     pub gpu_bc: bool,
+    /// Re-encode DXT textures to ASTC 4x4 (the GPU has ASTC but not BC). Ignored when `gpu_bc`.
+    pub gpu_astc: bool,
     /// Bake level Projector decals into the scene. p2game leaves them to the script (every
     /// Projector calls AttachProjector in PostBeginPlay, drawn by p2fx); baking them too drew
     /// each decal twice.
@@ -920,9 +924,10 @@ actor_static_light(&sm_obj, lin, Vec3::from(loc), props.bool("bSpecialLit") == S
 
     // --- Textures, decoded in parallel ---
     let gpu_bc = opts.gpu_bc;
+    let gpu_astc = opts.gpu_astc && !gpu_bc;
     let textures: Vec<TexData> = b.tex_objs.par_iter().map(|(o, op, invert)| match (op, invert) {
         (_, true) => {
-            let mut t = load_texture(o, false);
+            let mut t = load_texture(o, false, false);
             if t.format == PixelFormat::Rgba8 {
                 for m in t.mips.iter_mut() {
                     for p in m.chunks_exact_mut(4) {
@@ -935,7 +940,7 @@ actor_static_light(&sm_obj, lin, Vec3::from(loc), props.bool("bSpecialLit") == S
             t
         }
         (Some(op), _) => load_texture_opacity(o, op),
-        (None, _) => load_texture(o, gpu_bc),
+        (None, _) => load_texture(o, gpu_bc, gpu_astc),
     }).collect();
     b.stats.textures = textures.len();
     b.stats.bc_textures = textures.iter().filter(|t| t.format != PixelFormat::Rgba8).count();
@@ -1681,7 +1686,7 @@ fn placeholder(name: &str) -> TexData {
 
 /// RGBA8 texture whose alpha comes from a Shader Opacity texture (every mip).
 fn load_texture_opacity(o: &Obj, op: &Obj) -> TexData {
-    let mut t = load_texture(o, false);
+    let mut t = load_texture(o, false, false);
     if !matches!(t.format, PixelFormat::Rgba8) {
         return t;
     }
@@ -1696,7 +1701,38 @@ fn load_texture_opacity(o: &Obj, op: &Obj) -> TexData {
     t
 }
 
-fn load_texture(o: &Obj, gpu_bc: bool) -> TexData {
+thread_local! {
+    /// One encoder per thread (creating it is the expensive part).
+    static ASTC_CTX: std::cell::RefCell<Option<astcenc_rs::Context>> = const { std::cell::RefCell::new(None) };
+}
+
+/// Encodes one RGBA8 (sRGB) mip level as ASTC 4x4 blocks. None if the encoder fails.
+#[cfg(target_os = "android")]
+fn encode_astc(rgba: Vec<u8>, w: u32, h: u32) -> Option<Vec<u8>> {
+    ASTC_CTX.with(|c| {
+        let mut c = c.borrow_mut();
+        if c.is_none() {
+            let cfg = astcenc_rs::ConfigBuilder::new()
+                .with_profile(astcenc_rs::Profile::LdrSrgb)
+                .with_preset(astcenc_rs::PRESET_FAST)
+                .with_block_size(astcenc_rs::Extents::new(4, 4))
+                .build()
+                .ok()?;
+            *c = Some(astcenc_rs::Context::new(cfg).ok()?);
+        }
+        let img = astcenc_rs::Image { extents: astcenc_rs::Extents::new(w, h), data: vec![rgba] };
+        let ctx = c.as_mut()?;
+        ctx.compress::<u8, Vec<Vec<u8>>, Vec<u8>>(&img, astcenc_rs::Swizzle::rgba()).ok()
+    })
+}
+
+/// Desktop never encodes (its GPU reads BC directly).
+#[cfg(not(target_os = "android"))]
+fn encode_astc(_rgba: Vec<u8>, _w: u32, _h: u32) -> Option<Vec<u8>> {
+    None
+}
+
+fn load_texture(o: &Obj, gpu_bc: bool, gpu_astc: bool) -> TexData {
     let Ok(t) = read_texture(&o.pkg, o.export) else { return placeholder(o.name()) };
     let base = t.mips.first();
     let (w, h) = base.map(|m| (m.width, m.height)).unwrap_or((0, 0));
@@ -1724,6 +1760,28 @@ fn load_texture(o: &Obj, gpu_bc: bool) -> TexData {
         }
         if !mips.is_empty() {
             return TexData { name: t.name.clone(), width: w, height: h, format: fmt, mips };
+        }
+    }
+    // ASTC path: decode each DXT mip on the CPU and re-encode it as ASTC 4x4 (sRGB). Same memory
+    // as BC (16 bytes per 4x4 block) and the GPU reads it natively.
+    if let (true, Some(_)) = (gpu_astc, bc) {
+        let mut mips = Vec::new();
+        let (mut ew, mut eh) = (w, h);
+        for level in 0..t.mips.len() {
+            if t.mips[level].width != ew || t.mips[level].height != eh {
+                break;
+            }
+            let Ok((lw, lh, px)) = t.decode_rgba(level) else { break };
+            let Some(enc) = encode_astc(px, lw, lh) else { break };
+            mips.push(enc);
+            if ew == 1 && eh == 1 {
+                break;
+            }
+            ew = (ew / 2).max(1);
+            eh = (eh / 2).max(1);
+        }
+        if !mips.is_empty() {
+            return TexData { name: t.name.clone(), width: w, height: h, format: PixelFormat::Astc4x4, mips };
         }
     }
     // CPU decode path: decode every valid mip level to RGBA8.
